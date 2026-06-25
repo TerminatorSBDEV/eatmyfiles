@@ -3,794 +3,759 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EAT MY FILES | Secure P2P File Transfer</title>
-    <!-- Socket.io -->
+    <title>EAT MY FILES // EMF</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <!-- JSZip para compactar pastas no navegador -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <!-- ReCaptcha API -->
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <style>
         :root {
             --bg: #030712;
             --panel: #0b0f19;
-            --border: #1e293b;
+            --border: #1f2937;
             --accent: #00ff88;
             --accent-glow: rgba(0, 255, 136, 0.3);
-            --error: #ff3b30;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
+            --text: #e2e8f0;
+            --text-muted: #8892b0;
+            --error: #ff3366;
         }
 
         body, html {
             margin: 0; padding: 0; height: 100%;
-            background-color: var(--bg); color: var(--text-main);
-            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg); color: var(--text);
+            font-family: 'Fira Code', monospace, sans-serif;
             overflow-x: hidden;
         }
 
-        /* Fundo Futurista / Efeito de Scanlines */
-        body::before {
-            content: " "; display: block; position: fixed; inset: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 4px, 3px 100%; z-index: 999; pointer-events: none;
-        }
-
-        /* Container Principal */
-        .viewport {
+        /* Menu de Entrada / Moderação */
+        .screen {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            min-height: 100vh; padding: 20px; box-sizing: border-box;
+            height: 100vh; position: fixed; inset: 0; z-index: 100; background: var(--bg);
         }
 
-        /* Painel Base */
-        .panel {
-            background: var(--panel); border: 2px solid var(--border); border-radius: 12px;
-            padding: 30px; width: 100%; max-width: 650px; box-shadow: 0 0 30px rgba(0, 255, 136, 0.05);
-            position: relative; overflow: hidden; box-sizing: border-box;
-            transition: all 0.3s ease;
+        .box {
+            background: var(--panel); border: 2px solid var(--border); padding: 40px;
+            border-radius: 16px; text-align: center; width: 350px;
+            box-shadow: 0 10px 40px rgba(0, 255, 136, 0.05);
         }
 
-        .panel::before {
-            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
-            background: var(--accent); box-shadow: 0 0 10px var(--accent);
+        .title {
+            font-size: 2.2rem; font-weight: 900; color: var(--accent);
+            text-shadow: 0 0 15px var(--accent-glow); margin: 0 0 10px 0;
+            letter-spacing: -1px;
         }
 
-        /* Títulos */
-        h1.neon-title {
-            font-size: 2.2rem; font-weight: 900; color: var(--accent); text-align: center;
-            margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 4px;
-            text-shadow: 0 0 10px var(--accent-glow);
+        .desc {
+            font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;
+            margin-bottom: 25px; text-align: justify;
         }
 
-        .subtitle {
-            font-size: 0.95rem; color: var(--text-muted); line-height: 1.6;
-            margin-bottom: 25px; text-align: center;
-        }
-
-        /* Botões */
         .btn {
-            background: transparent; border: 1px solid var(--accent); color: var(--accent);
-            padding: 12px 24px; font-size: 0.9rem; font-weight: bold; border-radius: 6px;
-            cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
-            transition: 0.2s ease; width: 100%; margin-bottom: 12px; box-sizing: border-box;
+            width: 100%; padding: 14px; margin: 10px 0; background: var(--accent);
+            border: none; color: black; font-weight: bold; border-radius: 8px;
+            cursor: pointer; transition: 0.2s; font-size: 0.95rem; font-family: inherit;
         }
-        .btn:hover {
-            background: var(--accent); color: black; box-shadow: 0 0 15px var(--accent-glow);
-        }
-        .btn-danger {
-            border-color: var(--error); color: var(--error);
-        }
-        .btn-danger:hover {
-            background: var(--error); color: white; box-shadow: 0 0 15px rgba(255, 59, 48, 0.4);
+        .btn:hover { background: #00cc6a; box-shadow: 0 0 15px var(--accent-glow); }
+        .btn:disabled { background: #1f2937; color: #4b5563; cursor: not-allowed; box-shadow: none; }
+        .btn-secondary { background: #111827; color: #fff; border: 1px solid var(--border); }
+        .btn-secondary:hover { background: #1f2937; }
+
+        /* Container Principal do App */
+        .app-container {
+            display: none; grid-template-columns: 320px 1fr; height: 100vh;
         }
 
-        /* Inputs */
-        input[type="text"] {
-            width: 100%; padding: 12px; background: #000; border: 1px solid var(--border);
-            color: white; border-radius: 6px; box-sizing: border-box; outline: none;
-            text-align: center; font-family: monospace; font-size: 1.1rem; margin-bottom: 15px;
-        }
-        input[type="text"]:focus { border-color: var(--accent); }
-
-        /* Workspace Grid (OnServer) */
-        .grid-workspace {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;
+        /* Painel Lateral */
+        .sidebar {
+            background: var(--panel); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; padding: 20px;
         }
 
-        /* Statuses */
         .status-card {
-            border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: #070a12;
-            margin-bottom: 15px; font-size: 0.85rem;
+            background: #090d16; border: 1px solid var(--border);
+            padding: 15px; border-radius: 8px; margin-bottom: 15px;
         }
-        .status-item { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-        .indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #444; }
-        .indicator.online { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-        .indicator.inactive { background: #ffcc00; box-shadow: 0 0 8px #ffcc00; }
-        .indicator.offline { background: var(--error); box-shadow: 0 0 8px var(--error); }
-        .indicator.uploading { background: #00d2ff; box-shadow: 0 0 8px #00d2ff; }
+        .status-title { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
+        .status-value { font-size: 0.95rem; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; }
+        .status-dot.online { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .status-dot.inactive { background: #eab308; box-shadow: 0 0 8px #eab308; }
+        .status-dot.uploading { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
 
-        /* File List Box */
-        .file-box {
-            border: 1px solid var(--border); border-radius: 8px; background: #070a12;
-            height: 180px; overflow-y: auto; padding: 10px; font-size: 0.8rem;
+        /* Área de Listagem de Arquivos */
+        .main-panel {
+            display: flex; flex-direction: column; padding: 25px; overflow-y: auto;
         }
+
+        .file-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex-grow: 1;
+        }
+
+        .file-section {
+            background: var(--panel); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px; display: flex; flex-direction: column;
+            max-height: 70vh;
+        }
+
+        .section-title {
+            font-size: 1rem; color: var(--accent); border-bottom: 1px solid var(--border);
+            padding-bottom: 10px; margin-top: 0; margin-bottom: 15px;
+        }
+
+        .file-list {
+            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+        }
+
         .file-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 6px; border-bottom: 1px solid #141b2d;
-        }
-        .file-remove {
-            color: var(--error); cursor: pointer; font-weight: bold; font-size: 0.9rem;
+            background: #090d16; border: 1px solid var(--border);
+            padding: 10px 15px; border-radius: 6px; display: flex;
+            justify-content: space-between; align-items: center; font-size: 0.85rem;
         }
 
-        /* Pop-ups / Modais */
-        .modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 5000;
-            display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);
-        }
-        .modal-box {
-            background: var(--panel); border: 2px solid var(--accent); border-radius: 12px;
-            padding: 30px; width: 90%; max-width: 450px; text-align: center;
+        .file-info { display: flex; flex-direction: column; gap: 3px; max-width: 80%; }
+        .file-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-size { font-size: 0.75rem; color: var(--text-muted); }
+
+        .btn-remove {
+            background: transparent; border: none; color: var(--error);
+            font-size: 1.1rem; cursor: pointer; padding: 0 5px;
         }
 
-        /* Progresso */
-        .progress-container { width: 100%; background: #222; border-radius: 5px; height: 12px; margin: 15px 0; overflow: hidden; }
-        .progress-bar { width: 0%; height: 100%; background: var(--accent); transition: width 0.1s ease; }
-        .progress-bar.failed { background: var(--error); }
+        /* Popups / Modais */
+        .popup-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            display: none; align-items: center; justify-content: center; z-index: 500;
+        }
 
-        /* Notification */
-        #notif-toast {
-            position: fixed; bottom: 20px; right: 20px; background: var(--panel);
-            border-left: 4px solid var(--accent); padding: 15px 25px; border-radius: 4px;
-            z-index: 9999; display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        .popup-content {
+            background: var(--panel); border: 2px solid var(--border);
+            padding: 30px; border-radius: 12px; width: 320px; text-align: center;
+        }
+
+        /* Barra de Progresso */
+        .progress-container {
+            width: 100%; background: #090d16; border-radius: 10px;
+            height: 10px; margin: 15px 0; overflow: hidden; border: 1px solid var(--border);
+        }
+        .progress-bar {
+            height: 100%; width: 0%; background: var(--accent); transition: 0.1s;
         }
     </style>
 </head>
 <body>
 
-    <!-- Toast Local de Notificação -->
-    <div id="notif-toast"></div>
-
-    <div class="viewport">
-        
-        <!-- TELA 1: Boas Vindas & ReCaptcha -->
-        <div id="screen-welcome" class="panel">
-            <h1 class="neon-title">Eat My Files</h1>
-            <div class="subtitle">
-                Welcome to EMF. Here, you are able to upload files, folders, share and receive from friends or anyone else.<br><br>
-                On this app, you do not need to log in or make an account, it's completely free! You don't have to buy limits or wait to upload.<br><br>
-                <span style="color: var(--error); font-weight: bold;">But don't you dare test my server, or the consequences will not be good.</span><br><br>
-                Anyway, you have to pass through this ReCaptcha challenge to start.
+    <!-- Passo 1: Landing Page com reCAPTCHA -->
+    <div id="screen-landing" class="screen">
+        <div class="box" style="width: 420px;">
+            <div class="title">EAT MY FILES</div>
+            <div class="desc">
+                Welcome to EMF. Here, you are able to upload files, folders, share and receive from friends or anyone else. 
+                This app is completely free, with no space limits or wait times!<br><br>
+                <span style="color: var(--error); font-weight: bold;">WARNING:</span> Do not dare test my server, or the consequences will not be good.
             </div>
             
-            <!-- ReCaptcha Widget -->
-            <div style="display:flex; justify-content:center; margin-bottom: 20px;">
-                <div class="g-recaptcha" data-sitekey="6Lf8VTMtAAAAAAMXrs6lk-tLBjuW0u8ZV5LevzMz" data-callback="captchaPassed"></div>
+            <!-- Widget reCAPTCHA -->
+            <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                <div class="g-recaptcha" data-sitekey="6Lf8VTMtAAAAAAMXrs6lk-tLBjuW0u8ZV5LevzMz" data-callback="onCaptchaSuccess"></div>
             </div>
 
-            <button id="welcome-unlock-btn" class="btn" style="opacity: 0.5;" disabled>Unlock Workspace</button>
+            <button id="btn-captcha-verify" class="btn" disabled onclick="verifyCaptcha()">ENTER APP</button>
         </div>
+    </div>
 
-        <!-- TELA 2: Seleção de Fluxo (Criar ou Entrar) -->
-        <div id="screen-lobby" class="panel" style="display: none;">
-            <h1 class="neon-title">EMF Lobby</h1>
-            <div class="subtitle">Choose to initialize an upload portal or infiltrate an existing room.</div>
-            <button class="btn" onclick="createServerRoom()">Create Server</button>
-            <button class="btn btn-secondary" onclick="showJoinPanel()">Join a Server</button>
+    <!-- Passo 2: Seleção de Servidor -->
+    <div id="screen-setup" class="screen" style="display:none;">
+        <div class="box">
+            <h2 style="margin-top:0; color: var(--accent);">CHOOSE PATH</h2>
+            <button class="btn" onclick="createServer()">Create Server</button>
+            <div style="margin: 15px 0; color: var(--text-muted); font-size: 0.8rem;">OR</div>
+            <input type="text" id="join-code-input" placeholder="8-CHAR CODE" maxlength="8">
+            <button class="btn btn-secondary" onclick="joinServer()">Join Server</button>
         </div>
+    </div>
 
-        <!-- TELA 2.5: Inserir Código de Entrada -->
-        <div id="screen-join" class="panel" style="display: none;">
-            <h1 class="neon-title">Infiltrate Vector</h1>
-            <div class="subtitle">Enter the 8-character server code from your peer:</div>
-            <input type="text" id="room-code-input" placeholder="8-CHAR CODE" maxlength="8">
-            <button class="btn" onclick="submitJoinRequest()">Join Server</button>
-            <button class="btn btn-secondary" onclick="goBackToLobby()">Back</button>
+    <!-- Passo 2.5: Lobby de Espera (Apenas Host Vê) -->
+    <div id="screen-lobby" class="screen" style="display:none;">
+        <div class="box">
+            <h3 style="margin-top:0; color: var(--accent);">Lobby Created</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted);">Click the code to copy:</p>
+            <div id="lobby-code-display" style="font-size:1.8rem; font-weight:bold; letter-spacing:2px; cursor:pointer; color:var(--accent); margin: 15px 0;" onclick="copyLobbyCode()">--------</div>
+            <button class="btn btn-secondary" onclick="leaveLobby()">Leave Server</button>
         </div>
+    </div>
 
-        <!-- TELA 3: Criador Esperando Conexão -->
-        <div id="screen-hosting" class="panel" style="display: none;">
-            <h1 class="neon-title">Portal Created</h1>
-            <div class="subtitle">Click on the code to copy it, then share it with your peer:</div>
-            <div id="room-code-display" style="font-size:2rem; font-weight:bold; color:var(--accent); text-align:center; margin:20px 0; cursor:pointer;" onclick="copyRoomCode()">--------</div>
-            <button class="btn btn-danger" onclick="leaveServerRoom()">Leave Server</button>
-        </div>
-
-        <!-- TELA 4: Área de Trabalho do Servidor (OnServer Workspace) -->
-        <div id="screen-onserver" class="panel" style="width:100%; max-width:750px; display: none;">
-            <h1 class="neon-title" style="font-size:1.8rem;">EMF Workspace</h1>
+    <!-- Interface Principal de Compartilhamento -->
+    <div id="app" class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="title" style="font-size: 1.5rem;">EMF SHARE</div>
+            <hr style="border-color: var(--border); margin: 15px 0; width: 100%;">
             
-            <!-- Cards de Status -->
-            <div class="grid-workspace" style="grid-template-columns: 1fr 1fr; margin-bottom: 15px;">
-                <div class="status-card">
-                    <div style="font-weight:bold; border-bottom:1px solid var(--border); margin-bottom:10px;">YOU (Owner)</div>
-                    <div class="status-item"><div id="my-indicator" class="indicator online"></div> Status: <span id="my-status-text">ONLINE</span></div>
-                    <div>Files: <span id="my-count">0</span> (<span id="my-size">0 kb</span>)</div>
+            <!-- Status Card: Você -->
+            <div class="status-card">
+                <div class="status-title">You</div>
+                <div class="status-value">
+                    <div id="my-status-dot" class="status-dot online"></div>
+                    <span id="my-status-text">ONLINE</span>
                 </div>
-                <div class="status-card">
-                    <div style="font-weight:bold; border-bottom:1px solid var(--border); margin-bottom:10px;">GUEST</div>
-                    <div class="status-item"><div id="peer-indicator" class="indicator offline"></div> Status: <span id="peer-status-text">OFFLINE</span></div>
-                    <div>Files: <span id="peer-count">0</span> (<span id="peer-size">0 kb</span>)</div>
-                </div>
+                <div style="font-size:0.8rem; color:var(--text-muted);" id="my-stats-summary">0 files (0 KB)</div>
             </div>
 
-            <!-- Upload Zone -->
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <button class="btn btn-secondary" onclick="triggerFileInput('files')" id="upload-files-btn">Upload Files</button>
-                <button class="btn btn-secondary" onclick="triggerFileInput('folder')" id="upload-folder-btn">Upload Folder</button>
-                <input type="file" id="file-uploader" multiple style="display:none;" onchange="handleFileSelection(event, false)">
-                <input type="file" id="folder-uploader" multiple webkitdirectory style="display:none;" onchange="handleFileSelection(event, true)">
+            <!-- Status Card: Conectado -->
+            <div class="status-card">
+                <div class="status-title">Guest</div>
+                <div class="status-value">
+                    <div id="guest-status-dot" class="status-dot"></div>
+                    <span id="guest-status-text">OFFLINE</span>
+                </div>
+                <div style="font-size:0.8rem; color:var(--text-muted);" id="guest-stats-summary">0 files (0 KB)</div>
             </div>
 
-            <!-- Listas de Arquivos -->
-            <div class="grid-workspace">
-                <div>
-                    <div style="font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Your Shared Files</div>
-                    <div class="file-box" id="my-file-list"></div>
-                </div>
-                <div>
-                    <div style="font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Guest's Shared Files</div>
-                    <div class="file-box" id="peer-file-list"></div>
-                </div>
-            </div>
-
-            <button class="btn" style="margin-top:25px;" id="send-files-btn" onclick="initiateSendSequence()">Send Files</button>
-            <button class="btn btn-danger" onclick="leaveServerRoom()">Leave Server</button>
+            <button class="btn btn-secondary" style="margin-top: auto;" onclick="leaveLobby()">Leave</button>
         </div>
 
-    </div>
-
-    <!-- MODAL: Aguardando Resposta -->
-    <div id="modal-waiting" class="modal" style="display:none;">
-        <div class="modal-box">
-            <h3 style="color:var(--accent); margin-top:0;">Request Sent</h3>
-            <p>Waiting for Guest to accept...</p>
-        </div>
-    </div>
-
-    <!-- MODAL: Pedido de Download Recebido -->
-    <div id="modal-accept" class="modal" style="display:none;">
-        <div class="modal-box">
-            <h3 style="color:var(--accent); margin-top:0;">Download Request</h3>
-            <p id="accept-msg">Your Guest wants to send you 0 files, and the download size will be 0 kb. Will you accept?</p>
-            <div class="progress-container" id="countdown-bar" style="background:#555;">
-                <div class="progress-bar" id="countdown-progress" style="width:100%; background:var(--accent);"></div>
+        <!-- Painel de Arquivos -->
+        <div class="main-panel">
+            <div style="display: flex; gap: 15px; margin-bottom: 25px;">
+                <!-- Inputs Ocultos de Arquivo e Pasta -->
+                <input type="file" id="file-uploader" multiple style="display:none;" onchange="handleFileSelection(event)">
+                <input type="file" id="folder-uploader" webkitdirectory directory multiple style="display:none;" onchange="handleFileSelection(event)">
+                
+                <button class="btn" style="width: auto; flex:1;" id="upload-files-btn" onclick="triggerFileUpload(false)">Upload Files</button>
+                <button class="btn btn-secondary" style="width: auto; flex:1;" id="upload-folder-btn" onclick="triggerFileUpload(true)">Upload Folder</button>
+                <button class="btn" style="width: auto; flex: 1.2; background: #0070f3;" id="send-files-btn" onclick="initiateFileTransfer()">Send Files</button>
             </div>
-            <div style="font-size:0.8rem; margin-bottom:15px; color:var(--text-muted);"><span id="countdown-text">15</span>s remaining</div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn" onclick="respondToDownload(true)">YES</button>
-                <button class="btn btn-danger" onclick="respondToDownload(false)">NO</button>
+
+            <div class="file-grid">
+                <!-- Seus Arquivos -->
+                <div class="file-section">
+                    <h3 class="section-title">Your Files</h3>
+                    <div class="file-list" id="my-file-list"></div>
+                </div>
+
+                <!-- Arquivos do Conectado -->
+                <div class="file-section">
+                    <h3 class="section-title">Guest's Files</h3>
+                    <div class="file-list" id="guest-file-list"></div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: Barra de Progresso de Upload / Download -->
-    <div id="modal-progress" class="modal" style="display:none;">
-        <div class="modal-box">
-            <h3 id="progress-title" style="color:var(--accent); margin-top:0;">P2P Connection</h3>
-            <p id="progress-status-msg">Preparing file blocks...</p>
+    <!-- Modais / Popups -->
+    <div id="popup-overlay" class="popup-overlay">
+        <!-- Loader / Espera de Aceite -->
+        <div id="popup-waiting" class="popup-content" style="display:none;">
+            <h4 style="margin-top:0; color:var(--accent);">Buffering</h4>
+            <p id="waiting-msg">Waiting for Guest to accept...</p>
+        </div>
+
+        <!-- Confirmação de Recebimento -->
+        <div id="popup-incoming" class="popup-content" style="display:none;">
+            <h4 style="margin-top:0; color:var(--accent);">Incoming Transfer</h4>
+            <p id="incoming-msg">Your Guest wants to send you 0 files, and the download size will be 0 KB. Will you accept?</p>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" onclick="respondToTransfer(true)" style="margin:0;">YES</button>
+                <button class="btn btn-secondary" onclick="respondToTransfer(false)" style="margin:0;">NO</button>
+            </div>
+            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:10px;" id="incoming-timer">(15s remaining)</div>
+        </div>
+
+        <!-- Progresso de Download / Compressão -->
+        <div id="popup-progress" class="popup-content" style="display:none;">
+            <h4 id="progress-title" style="margin-top:0; color:var(--accent);">Transferring...</h4>
             <div class="progress-container">
-                <div class="progress-bar" id="transfer-progress-bar"></div>
+                <div class="progress-bar" id="transfer-progress"></div>
             </div>
-            <div id="progress-alert" style="color:var(--error); font-size:0.85rem; margin-top:10px; display:none; font-weight:bold;">⚠️ Connection dropped or transfer failed.</div>
-            <button class="btn btn-danger" id="close-progress-btn" style="display:none;" onclick="closeProgressModal()">Close</button>
+            <p id="progress-status" style="font-size:0.8rem; color:var(--text-muted);">0% complete</p>
         </div>
     </div>
 
 <script>
-    // --- CONFIGURAÇÃO DO SERVIDOR ---
-    // Substitua pelo seu IP/Link e porta atualizados quando rodar
-    const TUNNEL = "http://localhost:1225"; 
-    const AUTH_KEY = "default_key"; 
+    // --- CONFIGURAÇÃO SERVIDOR ---
+    const TUNNEL = "https://sheer-controls-clothing-resident.trycloudflare.com"; 
+    const AUTH_KEY = "Gow3w3WzY";
+    const socket = io(TUNNEL, { auth: { token: AUTH_KEY }, transports: ['websocket'] });
 
-    let socket;
-    let reqCount = 0;
-    
-    // --- ESTADOS EMF ---
-    let myId = 'u_' + Math.random().toString(36).substr(2, 9);
-    let myRole = 'visitor'; // 'host' ou 'guest'
-    let currentRoom = '';
-    let isConnectedToSocket = false;
-    
-    let selectedFiles = []; // Armazena objetos File do navegador
-    let isTransferring = false;
-    let activeCountdown = null;
+    let myRoom = "";
+    let isHost = false;
+    let verified = false;
+    let localFiles = [];      
+    let remoteFilesSummary = []; 
+    let currentStatus = "ONLINE";
 
-    // Monitoramento de Taxa de Requisição
-    setInterval(() => { reqCount = 0; }, 1000);
+    // Controle de limite de requisições de cliente (Máximo de 14 por segundo)
+    let clientRequestsThisSecond = 0;
+    setInterval(() => { clientRequestsThisSecond = 0; }, 1000);
 
-    function safeEmit(type, payload) {
-        if (reqCount >= 15) {
-            showToast("Warning: Request throttled (Max 15 req/s)");
-            return;
+    function canSendRequest() {
+        if (clientRequestsThisSecond >= 14) {
+            console.warn("[EMF Security] Rate Limit Client-Side triggered.");
+            return false;
         }
-        reqCount++;
-        if (socket && isConnectedToSocket) {
-            socket.emit(type, payload);
+        clientRequestsThisSecond++;
+        return true;
+    }
+
+    // --- RECAPTCHA LOGIC ---
+    function onCaptchaSuccess() {
+        document.getElementById('btn-captcha-verify').removeAttribute('disabled');
+    }
+
+    function verifyCaptcha() {
+        // No client-side, o token resolvido do widget é suficiente para o fluxo de simulação
+        const response = grecaptcha.getResponse();
+        if (response.length > 0) {
+            document.getElementById('screen-landing').style.display = 'none';
+            document.getElementById('screen-setup').style.display = 'flex';
         }
     }
 
-    // --- CAPTCHA INITIALIZATION ---
-    function captchaPassed() {
-        const unlockBtn = document.getElementById('welcome-unlock-btn');
-        unlockBtn.disabled = false;
-        unlockBtn.style.opacity = "1";
-        unlockBtn.onclick = () => {
-            document.getElementById('screen-welcome').style.display = 'none';
-            document.getElementById('screen-lobby').style.display = 'flex';
-            initializeSocket();
-        };
+    // --- SOCKET LOGIC ---
+    socket.on('connect', () => {
+        console.log("[EMF] Handshake complete.");
+    });
+
+    socket.on('RemoteEvent', (packet) => {
+        const d = packet;
+        if (!d) return;
+
+        // Gerenciamento de lobbies e controle de ocupação de sala (Máximo 2 pessoas)
+        if (d.type === 'emf_lobby_join') {
+            if (isHost && myRoom === d.room) {
+                // Host aceita a conexão e avisa que a sala está cheia
+                socket.emit('RemoteEvent', { type: 'emf_lobby_full', room: myRoom });
+                transitionToGame();
+            }
+        }
+
+        if (d.type === 'emf_lobby_full' && d.room === myRoom && !isHost) {
+            transitionToGame();
+        }
+
+        // Sincronização de status das máquinas
+        if (d.type === 'emf_status_sync' && d.room === myRoom) {
+            updateGuestStatus(d.status, d.size, d.count);
+        }
+
+        // Sincronização de listas de arquivos selecionados
+        if (d.type === 'emf_file_list_sync' && d.room === myRoom) {
+            remoteFilesSummary = d.files;
+            renderRemoteFiles();
+        }
+
+        // Fluxo de Transferência (Pedido)
+        if (d.type === 'emf_transfer_request' && d.room === myRoom) {
+            showIncomingRequest(d.count, d.size);
+        }
+
+        // Resposta do receptor
+        if (d.type === 'emf_transfer_response' && d.room === myRoom) {
+            handleTransferResponse(d.accept);
+        }
+
+        // Recepção dos pedaços binários (chunking)
+        if (d.type === 'emf_chunk' && d.room === myRoom) {
+            receiveChunk(d);
+        }
+
+        // Sincronizar saída
+        if (d.type === 'emf_leave' && d.room === myRoom) {
+            alert("Guest left the room.");
+            location.reload();
+        }
+    });
+
+    // --- MONITORAÇÃO DE FOCO (ONLINE / INACTIVE) ---
+    window.addEventListener('focus', () => {
+        if (gameActive()) {
+            sendStatusUpdate("ONLINE");
+        }
+    });
+
+    window.addEventListener('blur', () => {
+        if (gameActive()) {
+            sendStatusUpdate("INACTIVE");
+        }
+    });
+
+    function gameActive() {
+        return document.getElementById('app').style.display === 'grid';
     }
 
-    function initializeSocket() {
-        socket = io(TUNNEL, { auth: { token: AUTH_KEY } });
-
-        socket.on('connect', () => {
-            isConnectedToSocket = true;
-            showToast("Connected to EMF Core Server.");
-            updateMyStatus('ONLINE');
-        });
-
-        socket.on('connect_error', (err) => {
-            isConnectedToSocket = false;
-            showToast("Server Connection Refused. Check Key.");
-        });
-
-        socket.on('RemoteEvent', (packet) => {
-            if (packet.room !== currentRoom) return;
-            handleRemoteEvent(packet);
-        });
-    }
-
-    // --- LÓGICA DE COORDENAÇÃO DE SALA P2P ---
-    function createServerRoom() {
-        myRole = 'host';
-        currentRoom = Math.random().toString(36).substr(2, 8).toUpperCase();
+    // --- ROOM CREATION / JOIN ---
+    function createServer() {
+        if (!canSendRequest()) return;
+        isHost = true;
+        myRoom = Math.random().toString(36).substring(2, 10).toUpperCase(); // 8 Chars
         
-        document.getElementById('screen-lobby').style.display = 'none';
-        document.getElementById('screen-hosting').style.display = 'flex';
-        document.getElementById('room-code-display').innerText = currentRoom;
-    }
-
-    function showJoinPanel() {
-        document.getElementById('screen-lobby').style.display = 'none';
-        document.getElementById('screen-join').style.display = 'flex';
-    }
-
-    function goBackToLobby() {
-        document.getElementById('screen-join').style.display = 'none';
+        document.getElementById('screen-setup').style.display = 'none';
         document.getElementById('screen-lobby').style.display = 'flex';
+        document.getElementById('lobby-code-display').innerText = myRoom;
+
+        socket.emit('RemoteEvent', { type: 'emf_lobby_create', room: myRoom });
     }
 
-    function submitJoinRequest() {
-        const inputCode = document.getElementById('room-code-input').value.trim().toUpperCase();
-        if (inputCode.length !== 8) {
-            showToast("Code must be 8 characters.");
-            return;
-        }
-        myRole = 'guest';
-        currentRoom = inputCode;
-
-        // Tenta iniciar aperto de mão (handshake)
-        safeEmit('RemoteEvent', {
-            type: 'join_request',
-            room: currentRoom,
-            sender: myId
-        });
-        showToast("Probing portal connection...");
+    function copyLobbyCode() {
+        navigator.clipboard.writeText(myRoom);
+        alert("Room Code copied: " + myRoom);
     }
 
-    function leaveServerRoom() {
-        safeEmit('RemoteEvent', {
-            type: 'exit_room',
-            room: currentRoom,
-            sender: myId
-        });
+    function joinServer() {
+        if (!canSendRequest()) return;
+        const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+        if (code.length !== 8) return alert("Code must be 8 characters.");
+
+        isHost = false;
+        myRoom = code;
+
+        // Informa a sala que deseja conectar
+        socket.emit('RemoteEvent', { type: 'emf_lobby_join', room: myRoom });
+    }
+
+    function leaveLobby() {
+        if (!canSendRequest()) return;
+        socket.emit('RemoteEvent', { type: 'emf_leave', room: myRoom });
         location.reload();
     }
 
-    function copyRoomCode() {
-        const codeText = document.getElementById('room-code-display').innerText;
-        navigator.clipboard.writeText(codeText).then(() => {
-            showToast("Code copied to clipboard!");
+    function transitionToGame() {
+        document.getElementById('screen-lobby').style.display = 'none';
+        document.getElementById('screen-setup').style.display = 'none';
+        document.getElementById('app').style.display = 'grid';
+        sendStatusUpdate("ONLINE");
+    }
+
+    // --- STATUS UPDATES ---
+    function sendStatusUpdate(status) {
+        if (!canSendRequest()) return;
+        currentStatus = status;
+        const totalSize = getMyFilesSize();
+        
+        // Sincroniza dados com o outro usuário
+        socket.emit('RemoteEvent', {
+            type: 'emf_status_sync',
+            room: myRoom,
+            status: status,
+            size: totalSize,
+            count: localFiles.length
         });
+
+        // Atualiza a minha própria interface
+        document.getElementById('my-status-dot').className = `status-dot ${status.toLowerCase()}`;
+        document.getElementById('my-status-text').innerText = status;
+        document.getElementById('my-stats-summary').innerText = `${localFiles.length} files (${formatBytes(totalSize)})`;
     }
 
-    // --- RECEPTOR DE EVENTOS ---
-    let chunksBuffer = [];
-    let expectedChunks = 0;
-
-    function handleRemoteEvent(p) {
-        if (p.type === 'join_request') {
-            if (myRole === 'host') {
-                // Host aceita e compartilha o estado inicial
-                safeEmit('RemoteEvent', {
-                    type: 'join_accept',
-                    room: currentRoom,
-                    target: p.sender,
-                    sender: myId
-                });
-                enterWorkspace();
-                updatePeerStatus('ONLINE');
-            }
-        }
-
-        if (p.type === 'join_accept' && p.target === myId) {
-            enterWorkspace();
-            updatePeerStatus('ONLINE');
-            // Informa ao Host do meu status
-            syncFilesMeta();
-        }
-
-        if (p.type === 'exit_room' && p.sender !== myId) {
-            updatePeerStatus('OFFLINE');
-            showToast("Your peer has disconnected.");
-            resetPeerFiles();
-        }
-
-        if (p.type === 'status_sync' && p.sender !== myId) {
-            updatePeerStatus(p.status, p.totalSize, p.totalFiles);
-            renderPeerFiles(p.files);
-        }
-
-        if (p.type === 'send_request' && p.sender !== myId) {
-            showDownloadPrompt(p.fileCount, p.totalSize);
-        }
-
-        if (p.type === 'send_response' && p.sender !== myId) {
-            document.getElementById('modal-waiting').style.display = 'none';
-            if (p.accepted) {
-                showToast("Request approved. Compiling and sending blocks...");
-                compileAndSendZip();
-            } else {
-                showToast("Your peer has denied your request.");
-                unlockSendingControls();
-            }
-        }
-
-        if (p.type === 'chunk_transfer' && p.sender !== myId) {
-            handleIncomingChunk(p.chunk, p.index, p.total);
-        }
-
-        if (p.type === 'transfer_failed' && p.sender !== myId) {
-            showTransferFailure();
-        }
+    function updateGuestStatus(status, size, count) {
+        const dot = document.getElementById('guest-status-dot');
+        dot.className = `status-dot ${status.toLowerCase()}`;
+        document.getElementById('guest-status-text').innerText = status;
+        document.getElementById('guest-stats-summary').innerText = `${count} files (${formatBytes(size)})`;
     }
 
-    function enterWorkspace() {
-        document.getElementById('screen-hosting').style.display = 'none';
-        document.getElementById('screen-join').style.display = 'none';
-        document.getElementById('screen-onserver').style.display = 'flex';
-    }
-
-    // --- GESTÃO DE ARQUIVOS (LOCAL & PEER) ---
-    function triggerFileInput(type) {
-        // Dispara estado UPLOADING temporário
-        updateMyStatus('UPLOADING');
-        if (type === 'files') {
-            document.getElementById('file-uploader').click();
-        } else {
+    // --- MANIPULAÇÃO DE ARQUIVOS (YOUR FILES) ---
+    function triggerFileUpload(isFolder) {
+        sendStatusUpdate("UPLOADING"); // Status dinâmico ao abrir o explorer
+        if (isFolder) {
             document.getElementById('folder-uploader').click();
+        } else {
+            document.getElementById('file-uploader').click();
         }
     }
 
-    function handleFileSelection(event, isFolder) {
-        const files = event.target.files;
-        for (let file of files) {
-            selectedFiles.push(file);
+    function handleFileSelection(event) {
+        const selected = event.target.files;
+        for (let file of selected) {
+            localFiles.push(file);
         }
-        updateMyStatus('ONLINE');
-        renderMyFiles();
-        syncFilesMeta();
+        sendStatusUpdate("ONLINE");
+        syncFilesList();
     }
 
-    function removeMyFile(index) {
-        selectedFiles.splice(index, 1);
+    function removeFile(index) {
+        localFiles.splice(index, 1);
+        syncFilesList();
+    }
+
+    function syncFilesList() {
+        if (!canSendRequest()) return;
+        
+        // Envia lista simplificada (apenas nomes e tamanhos) para o outro ver
+        const summary = localFiles.map(f => ({ name: f.name, size: f.size }));
+        socket.emit('RemoteEvent', {
+            type: 'emf_file_list_sync',
+            room: myRoom,
+            files: summary
+        });
+
         renderMyFiles();
-        syncFilesMeta();
+        sendStatusUpdate("ONLINE"); // Recalcula tamanhos e status
     }
 
     function renderMyFiles() {
         const list = document.getElementById('my-file-list');
         list.innerHTML = "";
-        selectedFiles.forEach((file, index) => {
+        localFiles.forEach((file, index) => {
             const item = document.createElement('div');
-            item.className = 'file-item';
+            item.className = "file-item";
             item.innerHTML = `
-                <div>${file.name} (${formatSize(file.size)})</div>
-                <div class="file-remove" onclick="removeMyFile(${index})">X</div>
+                <div class="file-info">
+                    <div class="file-name" title="${file.name}">${file.name}</div>
+                    <div class="file-size">${formatBytes(file.size)}</div>
+                </div>
+                <button class="btn-remove" onclick="removeFile(${index})">✕</button>
             `;
             list.appendChild(item);
         });
     }
 
-    function renderPeerFiles(files) {
-        const list = document.getElementById('peer-file-list');
+    function renderRemoteFiles() {
+        const list = document.getElementById('guest-file-list');
         list.innerHTML = "";
-        if (!files || files.length === 0) return;
-        files.forEach(f => {
+        remoteFilesSummary.forEach((file) => {
             const item = document.createElement('div');
-            item.className = 'file-item';
-            item.innerHTML = `<div>${f.name} (${formatSize(f.size)})</div>`;
+            item.className = "file-item";
+            item.innerHTML = `
+                <div class="file-info">
+                    <div class="file-name" title="${file.name}">${file.name}</div>
+                    <div class="file-size">${formatBytes(file.size)}</div>
+                </div>
+            `;
             list.appendChild(item);
         });
     }
 
-    function resetPeerFiles() {
-        document.getElementById('peer-file-list').innerHTML = "";
-        updatePeerStatus('OFFLINE', 0, 0);
-    }
+    // --- SISTEMA DE TRANSFERÊNCIA CHUNKED (P2P SOBRE SOCKET) ---
+    let incomingAcceptTimeout;
+    let chunkQueue = [];
+    let receivedChunks = {};
+    let activeIncomingFiles = [];
 
-    // Sincroniza metadados dos arquivos com o outro par
-    function syncFilesMeta() {
-        const meta = selectedFiles.map(f => ({ name: f.name, size: f.size }));
-        const totalSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
-        
-        safeEmit('RemoteEvent', {
-            type: 'status_sync',
-            room: currentRoom,
-            sender: myId,
-            status: document.getElementById('my-status-text').innerText,
-            files: meta,
-            totalSize: totalSize,
-            totalFiles: selectedFiles.length
-        });
+    function initiateFileTransfer() {
+        if (localFiles.length === 0) return alert("Selecione os arquivos primeiro.");
+        if (!canSendRequest()) return;
 
-        // Atualiza a UI do usuário
-        document.getElementById('my-count').innerText = selectedFiles.length;
-        document.getElementById('my-size').innerText = formatSize(totalSize);
-    }
+        // Abre pop-up de espera do remetente
+        document.getElementById('popup-overlay').style.display = 'flex';
+        document.getElementById('popup-waiting').style.display = 'block';
 
-    // --- COORDENAÇÃO DE STATUS ---
-    function updateMyStatus(status) {
-        if (!isConnectedToSocket) return;
-        
-        const text = document.getElementById('my-status-text');
-        const indicator = document.getElementById('my-indicator');
-        text.className = "status-item";
-        text.innerText = status;
-        
-        indicator.className = "indicator " + status.toLowerCase();
-
-        // Avisa ao peer se as informações locais forem alteradas
-        syncFilesMeta();
-    }
-
-    function updatePeerStatus(status, size = 0, count = 0) {
-        const text = document.getElementById('peer-status-text');
-        const indicator = document.getElementById('peer-indicator');
-        text.innerText = status;
-        indicator.className = "indicator " + status.toLowerCase();
-
-        if (status !== 'OFFLINE') {
-            document.getElementById('peer-count').innerText = count;
-            document.getElementById('peer-size').innerText = formatSize(size);
-        } else {
-            document.getElementById('peer-count').innerText = 0;
-            document.getElementById('peer-size').innerText = "0 kb";
-        }
-    }
-
-    // Escuta visibilidade do navegador para estado INACTIVE
-    document.addEventListener('visibilitychange', () => {
-        if (gameActive) {
-            updateMyStatus(document.hidden ? 'INACTIVE' : 'ONLINE');
-        }
-    });
-
-    // --- PIPELINE DE ENVIO E BLOCOS (CHUNKS) ---
-    function lockSendingControls() {
-        isTransferring = true;
-        document.getElementById('send-files-btn').disabled = true;
-        document.getElementById('upload-files-btn').disabled = true;
-        document.getElementById('upload-folder-btn').disabled = true;
-    }
-
-    function unlockSendingControls() {
-        isTransferring = false;
-        document.getElementById('send-files-btn').disabled = false;
-        document.getElementById('upload-files-btn').disabled = false;
-        document.getElementById('upload-folder-btn').disabled = false;
-    }
-
-    function initiateSendSequence() {
-        if (selectedFiles.length === 0) {
-            showToast("Upload some files first.");
-            return;
-        }
-        lockSendingControls();
-        document.getElementById('modal-waiting').style.display = 'flex';
-
-        const totalSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
-
-        safeEmit('RemoteEvent', {
-            type: 'send_request',
-            room: currentRoom,
-            sender: myId,
-            fileCount: selectedFiles.length,
-            totalSize: totalSize
+        socket.emit('RemoteEvent', {
+            type: 'emf_transfer_request',
+            room: myRoom,
+            count: localFiles.length,
+            size: getMyFilesSize()
         });
     }
 
-    function showDownloadPrompt(count, size) {
-        document.getElementById('modal-accept').style.display = 'flex';
-        document.getElementById('accept-msg').innerText = `Your Guest wants to send you ${count} files, and the download size will be ${formatSize(size)}. Will you accept?`;
+    function showIncomingRequest(count, size) {
+        document.getElementById('popup-overlay').style.display = 'flex';
+        document.getElementById('popup-incoming').style.display = 'block';
+        document.getElementById('incoming-msg').innerText = `Your Guest wants to send you ${count} files, and the download size will be ${formatBytes(size)}. Will you accept?`;
 
-        let remaining = 15;
-        const progress = document.getElementById('countdown-progress');
-        const text = document.getElementById('countdown-text');
-        text.innerText = remaining;
-        progress.style.width = '100%';
-
-        activeCountdown = setInterval(() => {
-            remaining--;
-            text.innerText = remaining;
-            progress.style.width = (remaining / 15 * 100) + '%';
-
-            if (remaining <= 0) {
-                respondToDownload(false);
+        let timeLeft = 15;
+        document.getElementById('incoming-timer').innerText = `(${timeLeft}s remaining)`;
+        
+        clearInterval(incomingAcceptTimeout);
+        incomingAcceptTimeout = setInterval(() => {
+            timeLeft--;
+            document.getElementById('incoming-timer').innerText = `(${timeLeft}s remaining)`;
+            if (timeLeft <= 0) {
+                clearInterval(incomingAcceptTimeout);
+                respondToTransfer(false); // Recusa automática no timeout
             }
         }, 1000);
     }
 
-    function respondToDownload(accepted) {
-        clearInterval(activeCountdown);
-        document.getElementById('modal-accept').style.display = 'none';
-
-        safeEmit('RemoteEvent', {
-            type: 'send_response',
-            room: currentRoom,
-            sender: myId,
-            accepted: accepted
-        });
+    function respondToTransfer(accepted) {
+        clearInterval(incomingAcceptTimeout);
+        document.getElementById('popup-incoming').style.display = 'none';
 
         if (accepted) {
-            showProgressModal("Receiving Connection", "Establishing block connection...");
+            // Se aceitou, abre popup de progresso
+            document.getElementById('popup-progress').style.display = 'block';
+            document.getElementById('progress-title').innerText = "Downloading...";
+            document.getElementById('transfer-progress').style.backgroundColor = 'var(--accent)';
+            document.getElementById('transfer-progress').style.width = '0%';
+            
+            // Avisa o host
+            socket.emit('RemoteEvent', { type: 'emf_transfer_response', room: myRoom, accept: true });
+        } else {
+            document.getElementById('popup-overlay').style.display = 'none';
+            socket.emit('RemoteEvent', { type: 'emf_transfer_response', room: myRoom, accept: false });
         }
     }
 
-    // Compactação client-side com JSZip e fragmentação de blocos
-    function compileAndSendZip() {
-        showProgressModal("Sending Connection", "Compressing files into block archive...");
+    function handleTransferResponse(accepted) {
+        document.getElementById('popup-waiting').style.display = 'none';
+
+        if (accepted) {
+            // Bloqueia nova seleção ou novos envios do remetente durante a transferência
+            toggleInputs(false);
+            
+            document.getElementById('popup-progress').style.display = 'block';
+            document.getElementById('progress-title').innerText = "Compressing & Sending...";
+            document.getElementById('transfer-progress').style.backgroundColor = 'var(--accent)';
+            document.getElementById('transfer-progress').style.width = '0%';
+
+            startChunkedUpload();
+        } else {
+            document.getElementById('popup-overlay').style.display = 'none';
+            alert("Guest has denied your request.");
+        }
+    }
+
+    // Divide os arquivos em partes binárias de 64KB e transfere respeitando o limite
+    async function startChunkedUpload() {
         const zip = new JSZip();
-
-        selectedFiles.forEach(file => {
+        
+        // Compacta todos os arquivos selecionados localmente em um arquivo ZIP
+        for (let file of localFiles) {
             zip.file(file.name, file);
-        });
+        }
 
-        zip.generateAsync({ type: "arraybuffer" }, (metadata) => {
-            updateProgressBar(metadata.percent / 2); // 50% max para compressão
-        }).then((arrayBuffer) => {
-            // Inicia transferência via pacotes estáveis de 128KB
-            const chunkSize = 128 * 1024; 
-            const totalChunks = Math.ceil(arrayBuffer.byteLength / chunkSize);
+        try {
+            const blob = await zip.generateAsync({ type: 'blob' }, (metadata) => {
+                document.getElementById('progress-status').innerText = `Zipping: ${Math.floor(metadata.percent)}%`;
+            });
+
+            document.getElementById('progress-title').innerText = "Uploading...";
+            
+            // Fatiamento do ZIP gerado
+            const chunkSize = 64 * 1024; // 64 KB por pedaço
+            const totalChunks = Math.ceil(blob.size / chunkSize);
             let offset = 0;
 
-            showProgressModal("Sending Connection", "Streaming archive blocks...");
-
+            chunkQueue = [];
             for (let i = 0; i < totalChunks; i++) {
-                const chunk = arrayBuffer.slice(offset, offset + chunkSize);
+                const chunk = blob.slice(offset, offset + chunkSize);
                 offset += chunkSize;
-
-                // Transmite arraybuffer usando base64
-                const base64Chunk = arraybufferToBase64(chunk);
-
-                safeEmit('RemoteEvent', {
-                    type: 'chunk_transfer',
-                    room: currentRoom,
-                    sender: myId,
-                    index: i,
-                    total: totalChunks,
-                    chunk: base64Chunk
-                });
+                chunkQueue.push({ index: i, total: totalChunks, blobChunk: chunk });
             }
-        }).catch((err) => {
-            safeEmit('RemoteEvent', { type: 'transfer_failed', room: currentRoom, sender: myId });
-            showTransferFailure();
-        });
-    }
 
-    function handleIncomingChunk(chunkBase64, index, total) {
-        if (expectedChunks === 0) {
-            expectedChunks = total;
-            chunksBuffer = Array(total).fill(null);
-        }
+            // Envia de forma sequenciada a no máximo 10 requisições por segundo (Seguro contra Rate Limits)
+            sendNextChunk();
 
-        chunksBuffer[index] = base64ToArrayBuffer(chunkBase64);
-
-        // Calcula porcentagem do recebimento
-        const receivedCount = chunksBuffer.filter(c => c !== null).length;
-        const percent = (receivedCount / total) * 100;
-        
-        updateProgressBar(percent);
-        document.getElementById('progress-status-msg').innerText = `Assembling block ${receivedCount}/${total}...`;
-
-        if (receivedCount === total) {
-            compileReceivedZip();
+        } catch (e) {
+            handleTransferError();
         }
     }
 
-    function compileReceivedZip() {
-        document.getElementById('progress-status-msg').innerText = "Decompressing and downloading archive...";
-        
-        // Junta os buffers
-        const blob = new Blob(chunksBuffer, { type: "application/zip" });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = "EMFsharedfiles.zip";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    function sendNextChunk() {
+        if (chunkQueue.length === 0) {
+            // Finalizado com sucesso
+            setTimeout(() => {
+                document.getElementById('popup-overlay').style.display = 'none';
+                document.getElementById('popup-progress').style.display = 'none';
+                toggleInputs(true);
+                alert("Files sent successfully!");
+            }, 1000);
+            return;
+        }
 
-        // Finaliza
+        const task = chunkQueue.shift();
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            const base64Data = e.target.result.split(',')[1];
+            
+            // Envia o chunk via Socket
+            socket.emit('RemoteEvent', {
+                type: 'emf_chunk',
+                room: myRoom,
+                index: task.index,
+                total: task.total,
+                data: base64Data
+            });
+
+            const percent = Math.floor((task.index / task.total) * 100);
+            document.getElementById('transfer-progress').style.width = `${percent}%`;
+            document.getElementById('progress-status').innerText = `Uploading: ${percent}%`;
+
+            // Mantém um intervalo de 80ms entre envios (~12 req/segundo) para evitar kick de flood do servidor
+            setTimeout(sendNextChunk, 80);
+        };
+
+        reader.readAsDataURL(task.blobChunk);
+    }
+
+    function receiveChunk(d) {
+        if (!receivedChunks[myRoom]) receivedChunks[myRoom] = [];
+        
+        receivedChunks[myRoom][d.index] = d.data;
+        
+        const percent = Math.floor((Object.keys(receivedChunks[myRoom]).length / d.total) * 100);
+        document.getElementById('transfer-progress').style.width = `${percent}%`;
+        document.getElementById('progress-status').innerText = `Downloading: ${percent}%`;
+
+        if (Object.keys(receivedChunks[myRoom]).length === d.total) {
+            // Remonta o ZIP
+            try {
+                const base64Parts = receivedChunks[myRoom];
+                const byteCharacters = atob(base64Parts.join(''));
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const zipBlob = new Blob([byteArray], { type: 'application/zip' });
+
+                // Dispara download automático do ZIP
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = "EMFsharedfiles.zip";
+                link.click();
+
+                setTimeout(() => {
+                    document.getElementById('popup-overlay').style.display = 'none';
+                    document.getElementById('popup-progress').style.display = 'none';
+                    receivedChunks[myRoom] = [];
+                    alert("Download complete!");
+                }, 1000);
+
+            } catch (e) {
+                handleTransferError();
+            }
+        }
+    }
+
+    function handleTransferError() {
+        document.getElementById('transfer-progress').style.backgroundColor = 'var(--error)';
+        document.getElementById('progress-title').innerText = "Transfer Failed!";
+        document.getElementById('progress-status').innerText = "⚠️ Network error or connection closed.";
         setTimeout(() => {
-            document.getElementById('modal-progress').style.display = 'none';
-            showToast("Archive downloaded successfully!");
-            expectedChunks = 0;
-            chunksBuffer = [];
-        }, 1500);
+            document.getElementById('popup-overlay').style.display = 'none';
+            document.getElementById('popup-progress').style.display = 'none';
+            toggleInputs(true);
+        }, 4000);
     }
 
-    function showTransferFailure() {
-        const bar = document.getElementById('transfer-progress-bar');
-        bar.classList.add('failed');
-        document.getElementById('progress-alert').style.display = 'block';
-        document.getElementById('close-progress-btn').style.display = 'block';
-        unlockSendingControls();
-    }
-
-    // --- AUXILIARES E CONVERSORES DE ARRAYBUFFER ---
-    function arraybufferToBase64(buffer) {
-        let binary = '';
-        const bytes = new Uint8Array(buffer);
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
+    function toggleInputs(enabled) {
+        const el1 = document.getElementById('upload-files-btn');
+        const el2 = document.getElementById('upload-folder-btn');
+        const el3 = document.getElementById('send-files-btn');
+        if (enabled) {
+            el1.removeAttribute('disabled');
+            el2.removeAttribute('disabled');
+            el3.removeAttribute('disabled');
+        } else {
+            el1.setAttribute('disabled', 'true');
+            el2.setAttribute('disabled', 'true');
+            el3.setAttribute('disabled', 'true');
         }
-        return window.btoa(binary);
     }
 
-    function base64ToArrayBuffer(base64) {
-        const binary_string = window.atob(base64);
-        const len = binary_string.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = binary_string.charCodeAt(i);
-        }
-        return bytes.buffer;
+    // --- HELPERS ---
+    function getMyFilesSize() {
+        return localFiles.reduce((acc, f) => acc + f.size, 0);
     }
 
-    // --- UI HELPERS ---
-    function showProgressModal(title, msg) {
-        document.getElementById('modal-progress').style.display = 'flex';
-        document.getElementById('progress-title').innerText = title;
-        document.getElementById('progress-status-msg').innerText = msg;
-        document.getElementById('transfer-progress-bar').classList.remove('failed');
-        document.getElementById('transfer-progress-bar').style.width = '0%';
-        document.getElementById('progress-alert').style.display = 'none';
-        document.getElementById('close-progress-btn').style.display = 'none';
-    }
-
-    function updateProgressBar(percent) {
-        document.getElementById('transfer-progress-bar').style.width = percent + '%';
-    }
-
-    function closeProgressModal() {
-        document.getElementById('modal-progress').style.display = 'none';
-    }
-
-    function formatSize(bytes) {
-        if (bytes === 0) return '0 kb';
+    function formatBytes(bytes, decimals = 2) {
+        if (!+bytes) return '0 Bytes';
         const k = 1024;
-        const sizes = ['bytes', 'kb', 'MB', 'GB'];
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    function showToast(text) {
-        const toast = document.getElementById('notif-toast');
-        toast.innerText = text;
-        toast.style.display = 'block';
-        setTimeout(() => { toast.style.display = 'none'; }, 4000);
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
     }
 </script>
 </body>
