@@ -3,594 +3,672 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eat My Files (EMF) | Secure P2P Share</title>
-    <!-- Socket.io & JSZip Libraries -->
+    <title>EMF // Eat My Files</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <!-- Google reCAPTCHA -->
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-    
     <style>
         :root {
-            --bg: #05080c;
-            --panel: #0b1118;
-            --accent: #00ff88;
-            --accent-glow: rgba(0, 255, 136, 0.3);
-            --border: #1f2e3d;
-            --text: #e1e7f0;
-            --error: #ff4466;
+            --neon-blue: #00f0ff;
+            --neon-pink: #ff007f;
+            --neon-green: #00ff88;
+            --bg-dark: #050508;
+            --panel: #0d0d15;
+            --border: #1f1f38;
         }
 
         body, html {
             margin: 0; padding: 0; height: 100%;
-            background-color: var(--bg); color: var(--text);
+            background-color: var(--bg-dark); color: #e1e1e6;
             font-family: 'Courier New', Courier, monospace;
             overflow-x: hidden;
         }
 
-        /* Scanlines futuristas */
+        /* Scanline & Grid Effect */
         body::before {
             content: " "; display: block; position: fixed; inset: 0;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 9999; background-size: 100% 4px, 6px 100%; pointer-events: none;
+            background-size: 100% 4px, 6px 100%; z-index: 9999; pointer-events: none;
         }
 
-        /* Container de Telas */
-        .viewport {
+        .cyber-container {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             min-height: 100vh; padding: 20px; box-sizing: border-box;
         }
 
-        .card {
+        .panel {
             background: var(--panel); border: 2px solid var(--border);
             border-radius: 12px; padding: 40px; width: 100%; max-width: 500px;
-            box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 15px rgba(0, 255, 136, 0.05);
-            text-align: center; position: relative;
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.15); text-align: center;
+            position: relative; overflow: hidden;
         }
 
-        .card::after {
-            content: ''; position: absolute; inset: -2px; border-radius: 12px;
-            background: linear-gradient(45deg, var(--accent), transparent, var(--accent));
-            z-index: -1; filter: blur(5px); opacity: 0.15;
+        .panel::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(0, 240, 255, 0.1), transparent);
+            transform: skewX(-25deg); transition: 0.75s;
         }
+        .panel:hover::before { left: 125%; }
 
-        h1 { color: var(--accent); text-shadow: 0 0 10px var(--accent-glow); letter-spacing: 3px; margin-top: 0; }
-
-        .warning-box {
-            background: rgba(255, 68, 102, 0.1); border: 1px solid var(--error);
-            padding: 15px; border-radius: 6px; color: var(--error);
-            font-size: 0.85rem; margin: 20px 0; line-height: 1.4; text-align: left;
-        }
+        h1 { font-size: 2.2rem; margin: 0 0 10px 0; color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); letter-spacing: 2px; }
+        p { font-size: 0.9rem; line-height: 1.6; color: #8a8a9e; }
+        .danger-text { color: var(--neon-pink); text-shadow: 0 0 5px var(--neon-pink); font-weight: bold; }
 
         .btn {
-            background: transparent; border: 1px solid var(--accent); color: var(--accent);
-            padding: 12px 24px; font-weight: bold; border-radius: 6px; cursor: pointer;
-            text-transform: uppercase; font-family: inherit; transition: 0.2s; width: 100%;
-            box-sizing: border-box; margin: 8px 0; letter-spacing: 1px;
+            background: transparent; border: 1px solid var(--neon-blue); color: var(--neon-blue);
+            padding: 12px 24px; font-size: 0.95rem; font-family: inherit; font-weight: bold;
+            border-radius: 6px; cursor: pointer; transition: 0.3s; margin: 10px 0; width: 100%;
+            box-sizing: border-box; text-shadow: 0 0 5px var(--neon-blue); box-shadow: inset 0 0 5px rgba(0, 240, 255, 0.2);
         }
-        .btn:hover { background: var(--accent); color: black; box-shadow: 0 0 15px var(--accent); }
-        .btn:disabled { border-color: #444; color: #444; cursor: not-allowed; box-shadow: none; }
+        .btn:hover { background: var(--neon-blue); color: black; box-shadow: 0 0 15px var(--neon-blue); }
+        .btn-secondary { border-color: var(--neon-pink); color: var(--neon-pink); text-shadow: 0 0 5px var(--neon-pink); }
+        .btn-secondary:hover { background: var(--neon-pink); color: black; box-shadow: 0 0 15px var(--neon-pink); }
 
-        .btn-danger { border-color: var(--error); color: var(--error); }
-        .btn-danger:hover { background: var(--error); color: white; box-shadow: 0 0 15px var(--error); }
+        /* Game Room Grid */
+        .room-grid { display: none; grid-template-columns: 1fr; gap: 20px; width: 100%; max-width: 900px; z-index: 10; margin-top: 20px;}
+        @media (min-width: 768px) { .room-grid { grid-template-columns: 1fr 1.5fr; } }
 
-        /* OnServer Layout */
-        .server-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
-            width: 100%; max-width: 1000px; margin-top: 20px;
-        }
+        /* Statuses */
+        .status-box { background: var(--panel); border: 1px solid var(--border); padding: 15px; border-radius: 8px; text-align: left; }
+        .status-line { margin: 8px 0; font-size: 0.9rem; }
+        .status-tag { padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.75rem; }
+        .tag-online { background: rgba(0, 255, 136, 0.1); color: var(--neon-green); border: 1px solid var(--neon-green); }
+        .tag-inactive { background: rgba(255, 165, 0, 0.1); color: orange; border: 1px solid orange; }
+        .tag-offline { background: rgba(255, 0, 127, 0.1); color: var(--neon-pink); border: 1px solid var(--neon-pink); }
+        .tag-upload { background: rgba(0, 240, 255, 0.1); color: var(--neon-blue); border: 1px solid var(--neon-blue); }
 
-        .status-container {
-            grid-column: span 2; display: flex; justify-content: space-between;
-            background: #0d151e; padding: 15px 25px; border-radius: 8px; border: 1px solid var(--border);
-        }
-
-        .status-badge { font-size: 0.9rem; font-weight: bold; }
-        .status-val { color: var(--accent); }
-
-        .panel-box {
-            background: var(--panel); border: 1px solid var(--border);
-            border-radius: 8px; padding: 20px; height: 400px; display: flex; flex-direction: column;
-        }
-
-        .file-list { flex-grow: 1; overflow-y: auto; background: #04070a; border-radius: 6px; padding: 10px; margin-top: 10px; text-align: left; }
-        .file-item {
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 0.85rem; padding: 6px 0; border-bottom: 1px solid #111;
-        }
-        .file-remove { color: var(--error); cursor: pointer; font-weight: bold; font-size: 1.1rem; }
+        /* File list */
+        .file-list-container { background: #07070c; border: 1px solid var(--border); border-radius: 8px; height: 180px; overflow-y: auto; padding: 10px; margin-top: 5px; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; border-bottom: 1px solid #141424; padding: 6px 0; }
+        .remove-btn { color: var(--neon-pink); cursor: pointer; font-weight: bold; }
 
         /* Popups */
-        .popup-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-            display: none; align-items: center; justify-content: center; z-index: 10000;
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center; z-index: 1000;
         }
-        .popup-box {
-            background: var(--panel); border: 2px solid var(--accent); padding: 30px;
-            border-radius: 12px; max-width: 350px; text-align: center;
+        .modal-box {
+            background: var(--panel); border: 2px solid var(--neon-blue); padding: 30px;
+            border-radius: 12px; width: 90%; max-width: 400px; text-align: center;
         }
 
         /* Progress Bar */
-        .progress-container { width: 100%; background: #222; border-radius: 6px; height: 16px; margin: 15px 0; overflow: hidden; }
-        .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.1s; }
-        .progress-bar.failed { background: var(--error); }
+        .progress-bar-container { background: #111; border: 1px solid var(--border); height: 15px; border-radius: 4px; overflow: hidden; margin-top: 15px; }
+        .progress-fill { background: var(--neon-green); height: 100%; width: 0%; transition: width 0.1s; }
+        .progress-fill.error { background: var(--neon-pink); }
+
+        /* Dropzone */
+        .dropzone {
+            border: 2px dashed var(--border); padding: 20px; border-radius: 8px; text-align: center;
+            cursor: pointer; background: rgba(0,0,0,0.3); transition: 0.3s; margin-top: 10px;
+        }
+        .dropzone:hover { border-color: var(--neon-blue); background: rgba(0, 240, 255, 0.02); }
     </style>
 </head>
 <body>
 
-    <!-- 1. Tela de Login / VAD / Captura de Credenciais -->
-    <div id="screen-login" class="screen">
-        <div class="box">
-            <h1 style="color: var(--accent); margin-top: 0; font-size: 1.8rem; letter-spacing: 2px;">EAT MY FILES</h1>
-            <p style="font-size: 0.8rem; line-height: 1.4; color: #888;">
-                Welcome to EMF. Upload files, folders, and share seamlessly. No registrations, completely free.
-            </p>
-            <div class="warning-box">
-                ⚠️ SYSTEM WARNING:<br>
-                Don't you dare test my server, or the consequences will not be good.
-            </div>
-            <p style="font-size:0.75rem; margin-bottom:15px; color:#555;">Complete the reCAPTCHA below to proceed:</p>
-            <div style="display:flex; justify-content:center; margin-bottom:15px;">
-                <div class="g-recaptcha" data-sitekey="6Lf8VTMtAAAAAAMXrs6lk-tLBjuW0u8ZV5LevzMz" data-callback="onCaptchaSuccess"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. Tela Principal (Criar / Entrar) -->
-    <div id="screen-main" class="screen" style="display:none;">
-        <div class="box">
-            <h2>Select Operation</h2>
-            <button class="btn" onclick="createServer()">Create Server</button>
-            <input type="text" id="join-code-input" placeholder="ENTER 8-CHAR CODE" maxlength="8">
-            <button class="btn btn-secondary" onclick="joinServer()">Join Server</button>
-        </div>
-    </div>
-
-    <!-- 3. Tela de Espera do Host -->
-    <div id="screen-waiting" class="screen" style="display:none;">
-        <div class="box">
-            <h3>Server Created</h3>
-            <p style="color:#888; font-size:0.8rem;">Click the code below to copy:</p>
-            <div id="share-code" style="font-size: 1.8rem; color: var(--accent); font-weight: bold; cursor: pointer; letter-spacing: 3px; margin: 20px 0;" onclick="copyCode()">--------</div>
-            <button class="btn btn-danger" onclick="leaveServer()">Leave Server</button>
-        </div>
-    </div>
-
-    <!-- 4. Painel de Transferência (OnServer) -->
-    <div id="screen-onserver" class="viewport" style="display:none;">
-        <h2 style="color: var(--accent); margin-bottom: 5px;">EMF CONNECTED PANEL</h2>
+    <div class="cyber-container">
         
-        <div class="status-container">
-            <div class="status-badge">You: <span class="status-val" id="my-status">[ONLINE]</span> - <span id="my-size">0 KB</span> - <span id="my-count">0 files</span></div>
-            <div class="status-badge">Guest: <span class="status-val" id="guest-status">[OFFLINE]</span> - <span id="guest-size">0 KB</span> - <span id="guest-count">0 files</span></div>
+        <!-- Tela 1: Boas-vindas e ReCAPTCHA -->
+        <div id="screen-welcome" class="panel">
+            <h1>EAT MY FILES</h1>
+            <p>Welcome to EMF. Here, you are able to upload files, folders, share and receive from friends or anyone else.</p>
+            <p>On this app, you do not need to log in or make an account, it's completely free!</p>
+            <p>When I say completely free, I mean you don't have to buy more limits or wait till you can upload more, it's free!</p>
+            <p class="danger-text">But don't you dare test my server or the consequences will not be good.</p>
+            
+            <!-- ReCAPTCHA widget -->
+            <div style="display: flex; justify-content: center; margin: 20px 0;">
+                <div class="g-recaptcha" data-sitekey="6Lf8VTMtAAAAAAMXrs6lk-tLBjuW0u8ZV5LevzMz" data-callback="captchaSolved"></div>
+            </div>
+            <button id="entry-btn" class="btn" disabled>VERIFYING INTEGRITY...</button>
         </div>
 
-        <div class="server-grid">
-            <div class="panel-box">
-                <h4 style="margin:0; color:var(--accent)">YOUR SELECTION</h4>
-                <div class="file-list" id="my-files-list"></div>
-                <div style="margin-top:15px; display:flex; gap:10px;">
-                    <button class="btn" onclick="triggerFileInput('files')">Files</button>
-                    <button class="btn" onclick="triggerFileInput('folder')">Folder</button>
+        <!-- Tela 2: Menu Principal (Create/Join) -->
+        <div id="screen-menu" class="panel" style="display:none;">
+            <h1>SELECT CHANNEL</h1>
+            <p>Establish a secure peer-to-peer file bridge.</p>
+            <button class="btn" onclick="createServer()">CREATE SERVER</button>
+            <div style="margin: 15px 0; color:#555;">// OR //</div>
+            <input type="text" id="server-code-input" placeholder="ENTER 8-CHAR BRIDGE CODE" maxlength="8">
+            <button class="btn btn-secondary" onclick="joinServer()">JOIN SERVER</button>
+        </div>
+
+        <!-- Tela 3: Aguardando Amigo (Host Mode) -->
+        <div id="screen-waiting" class="panel" style="display:none;">
+            <h1>BRIDGE ACTIVE</h1>
+            <p>Click on the code to copy and share it with your friend.</p>
+            <div id="room-code-display" style="font-size: 2rem; font-weight: bold; color: var(--neon-blue); margin: 20px 0; cursor: pointer; letter-spacing: 3px;" onclick="copyRoomCode()">--------</div>
+            <button class="btn btn-secondary" onclick="leaveServer()">LEAVE SERVER</button>
+        </div>
+
+        <!-- Tela 4: Painel Principal OnServer (Compartilhamento) -->
+        <div id="room-dashboard" class="room-grid">
+            <div class="status-box">
+                <h3 style="margin-top:0; color: var(--neon-blue);">// STATUS PORT</h3>
+                
+                <div class="status-line">
+                    You: <span id="my-status" class="status-tag tag-online">ONLINE</span>
+                    <div style="font-size:0.75rem; margin-top:4px; color:#666;" id="my-stats-detail">0 files (0 KB)</div>
                 </div>
-                <button class="btn" id="send-btn" onclick="initiateSend()">Send Files</button>
+                <div class="status-line">
+                    Guest: <span id="guest-status" class="status-tag tag-offline">OFFLINE</span>
+                    <div style="font-size:0.75rem; margin-top:4px; color:#666;" id="guest-stats-detail">0 files (0 KB)</div>
+                </div>
+
+                <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+                    📁 Click or Drop Files & Folders here
+                    <input type="file" id="file-input" multiple style="display:none;" onchange="handleFileSelect(event)">
+                </div>
+                <button class="btn" id="send-btn" onclick="requestSend()" style="margin-top: 15px;">SEND FILES</button>
+                <button class="btn btn-secondary" onclick="leaveServer()">DISCONNECT</button>
             </div>
 
-            <div class="panel-box">
-                <h4 style="margin:0; color:#58a6ff">GUEST'S SELECTION</h4>
-                <div class="file-list" id="guest-files-list"></div>
-                <button class="btn btn-danger" onclick="leaveServer()" style="margin-top:auto;">Disconnect</button>
+            <div class="status-box">
+                <h3 style="margin-top:0; color: var(--neon-blue);">// DATABASE</h3>
+                
+                <label style="font-size:0.75rem; color:#888;">YOUR FILES:</label>
+                <div class="file-list-container" id="my-files-list"></div>
+
+                <label style="font-size:0.75rem; color:#888; margin-top:15px; display:block;">GUEST'S FILES:</label>
+                <div class="file-list-container" id="guest-files-list"></div>
             </div>
         </div>
     </div>
 
-    <!-- Ocultos para manipulação -->
-    <input type="file" id="picker-files" multiple style="display:none;" onchange="handleFileSelection(event)">
-    <input type="file" id="picker-folder" webkitdirectory directory multiple style="display:none;" onchange="handleFileSelection(event)">
-
-    <!-- Popups / Modais -->
-    <div id="popup-wait" class="popup-overlay">
-        <div class="popup-box">
-            <h3>Waiting...</h3>
-            <p>Waiting for Guest to accept the file transfer.</p>
+    <!-- Modals & Popups -->
+    <div id="modal-waiting-accept" class="modal">
+        <div class="modal-box">
+            <h3 style="color:var(--neon-blue);">WAITING CONFIRMATION</h3>
+            <p>Waiting for Guest to accept your transfer request...</p>
         </div>
     </div>
 
-    <div id="popup-receive" class="popup-overlay">
-        <div class="popup-box">
-            <h3 style="color: var(--accent);">Incoming Transfer</h3>
-            <p id="receive-text">Your Guest wants to send you 0 files (0 kb).</p>
-            <div style="font-weight:bold; font-size:1.2rem; margin: 10px 0;" id="countdown-text">15s remaining</div>
+    <div id="modal-incoming-request" class="modal">
+        <div class="modal-box">
+            <h3 style="color:var(--neon-blue);">INCOMING TRANSFER</h3>
+            <p id="incoming-text">Your Guest wants to send you 0 files, and the download size will be 0 KB. Will you accept?</p>
             <div style="display:flex; gap:10px;">
-                <button class="btn" onclick="respondTransfer(true)">YES</button>
-                <button class="btn btn-danger" onclick="respondTransfer(false)">NO</button>
+                <button class="btn" onclick="acceptTransfer()">YES</button>
+                <button class="btn btn-secondary" onclick="denyTransfer()">NO</button>
             </div>
+            <p style="margin-top:10px; font-size:0.8rem;" id="timer-text">(15s remaining)</p>
         </div>
     </div>
 
-    <div id="popup-progress" class="popup-overlay">
-        <div class="popup-box" style="width:300px;">
-            <h3 id="progress-title">Transferring...</h3>
-            <div class="progress-container">
-                <div id="progress-bar" class="progress-bar"></div>
+    <div id="modal-progress" class="modal">
+        <div class="modal-box">
+            <h3 id="progress-title" style="color:var(--neon-green);">ESTABLISHING ENCRYPTED DATA PIPE</h3>
+            <p id="progress-status">Compressing and writing streams...</p>
+            <div class="progress-bar-container">
+                <div id="progress-fill" class="progress-fill"></div>
             </div>
-            <span id="progress-percent">0%</span>
+            <p id="progress-percent" style="margin-top:10px; font-size:0.85rem;">0%</p>
         </div>
     </div>
 
 <script>
-    // --- CREDENCIAIS ---
-    const TUNNEL = "https://schema-valid-treo-graduated.trycloudflare.com";
-    const AUTH_KEY = "UVSOmc6cc";
+    // --- CONFIGURAÇÃO DE CONEXÃO ---
+    const TUNNEL = "https://advertising-born-increase-allowing.trycloudflare.com";
+    const AUTH_KEY = "3mg40B4X8";
     const socket = io(TUNNEL, { auth: { token: AUTH_KEY }, transports: ['websocket'] });
 
-    let myId = 'u_' + Math.random().toString(36).substr(2, 9);
+    let myId = "emf_" + Math.random().toString(36).substr(2, 9);
     let myRoom = "";
     let isHost = false;
+    let limitRequestsCount = 0;
     
-    // Arquivos locais selecionados
-    let selectedFiles = [];
-    let guestFiles = [];
-    let requestHistory = []; // Para rate-limiting
+    // Arquivos Locais
+    let localFilesList = [];
+    let guestFilesMetadata = [];
 
-    // --- RATE LIMIT CHECK (Max 15 reqs/s) ---
-    function safeEmit(event, data) {
-        const now = Date.now();
-        requestHistory = requestHistory.filter(t => now - t < 1000);
-        if (requestHistory.length >= 15) {
-            alert("Rate limit exceeded! Maximum 15 actions per second.");
-            return false;
+    // Transfer State
+    let transferQueue = [];
+    let expectedChunks = 0;
+    let receivedChunks = [];
+    let isCurrentlySending = false;
+    let countdownInterval;
+
+    // --- RATE LIMIT SECURITY VALVE (MAX 15 REQS/S) ---
+    setInterval(() => {
+        if (limitRequestsCount > 15) {
+            alert("SECURITY: Rate limit exceeded (Max 15 requests per second). Connection terminated for system protection.");
+            location.reload();
         }
-        requestHistory.push(now);
-        socket.emit(event, data);
-        return true;
+        limitRequestsCount = 0;
+    }, 1000);
+
+    function trackRequest() {
+        limitRequestsCount++;
     }
 
-    // --- RECAPTCHA SYSTEM ---
-    function onCaptchaSuccess() {
-        document.getElementById('screen-login').style.display = 'none';
-        document.getElementById('screen-main').style.display = 'flex';
+    // --- CAPTCHA SOLVER ---
+    function captchaSolved() {
+        const btn = document.getElementById('entry-btn');
+        btn.disabled = false;
+        btn.innerText = "ACCESS GRANTED";
+        btn.onclick = () => {
+            document.getElementById('screen-welcome').style.display = 'none';
+            document.getElementById('screen-menu').style.display = 'flex';
+        };
     }
 
-    // --- MATCHMAKING (P2P Over Ezbridge) ---
+    // --- GAME ROOM/BRIDGE LOGIC ---
     function createServer() {
-        myRoom = Math.random().toString(36).substring(2, 10).toUpperCase(); // 8-char
+        trackRequest();
+        myRoom = Math.random().toString(36).substring(2, 10).toUpperCase(); // 8-char code
         isHost = true;
-        document.getElementById('screen-main').style.display = 'none';
+        document.getElementById('screen-menu').style.display = 'none';
         document.getElementById('screen-waiting').style.display = 'flex';
-        document.getElementById('share-code').innerText = myRoom;
+        document.getElementById('room-code-display').innerText = myRoom;
+
+        socket.emit('RemoteEvent', { type: 'emf_room_created', room: myRoom, host: myId });
     }
 
     function joinServer() {
-        const code = document.getElementById('join-code-input').value.trim().toUpperCase();
-        if (code.length !== 8) return alert("Code must be 8 characters.");
+        trackRequest();
+        const code = document.getElementById('server-code-input').value.toUpperCase().trim();
+        if (code.length !== 8) return alert("Invalid 8-character code.");
         
         myRoom = code;
         isHost = false;
-        
-        // Solicita entrada ao Host da sala
-        safeEmit('RemoteEvent', {
-            type: 'emf_join_request',
-            room: myRoom,
-            sender: myId
-        });
+        socket.emit('RemoteEvent', { type: 'emf_room_join_req', room: myRoom, guest: myId });
+    }
+
+    function leaveServer() {
+        trackRequest();
+        socket.emit('RemoteEvent', { type: 'emf_leave', room: myRoom, sender: myId });
+        location.reload();
+    }
+
+    function copyRoomCode() {
+        navigator.clipboard.writeText(myRoom);
+        showNotif("Code copied to clipboard!");
     }
 
     // --- NETWORK RESPONSES ---
-    socket.on('RemoteEvent', async (p) => {
-        if (p.room !== myRoom && p.type !== 'emf_join_request') return;
+    socket.on('RemoteEvent', (packet) => {
+        if (packet.room !== myRoom && packet.type !== 'emf_room_join_req') return;
+        trackRequest();
 
-        // Host recebe pedido de conexão
-        if (p.type === 'emf_join_request' && isHost) {
-            // Aceita conexão se a sala estiver vazia
-            safeEmit('RemoteEvent', {
-                type: 'emf_join_accept',
-                room: myRoom,
-                host: myId,
-                guest: p.sender
-            });
-            goToOnServerPanel();
+        // Host recebe requisição de entrada
+        if (packet.type === 'emf_room_join_req' && packet.room === myRoom && isHost) {
+            socket.emit('RemoteEvent', { type: 'emf_room_join_accept', room: myRoom, host: myId });
+            enterDashboard();
         }
 
-        // Conexão aceita pelo Host
-        if (p.type === 'emf_join_accept' && !isHost && p.guest === myId) {
-            goToOnServerPanel();
+        // Convidado recebe aceitação do Host
+        if (packet.type === 'emf_room_join_accept' && !isHost) {
+            enterDashboard();
         }
 
-        // Sincronização de status e arquivos do Guest
-        if (p.type === 'emf_sync' && p.sender !== myId) {
-            document.getElementById('guest-status').innerText = `[${p.status}]`;
-            document.getElementById('guest-size').innerText = formatSize(p.totalSize);
-            document.getElementById('guest-count').innerText = `${p.fileCount} files`;
-            
-            guestFiles = p.files;
-            renderGuestFiles();
-        }
-
-        // Quando o parceiro desconecta
-        if (p.type === 'emf_leave' && p.sender !== myId) {
-            alert("Your Guest disconnected.");
+        if (packet.type === 'emf_leave') {
+            alert("Your peer has disconnected.");
             location.reload();
         }
 
-        // Fluxo de Envio: Recebedor exibe popup
-        if (p.type === 'emf_transfer_request' && p.sender !== myId) {
-            showReceivePopup(p.fileCount, p.totalSize);
-        }
-
-        // Resposta da solicitação de transferência
-        if (p.type === 'emf_transfer_response' && p.sender !== myId) {
-            document.getElementById('popup-wait').style.display = 'none';
-            if (p.accepted) {
-                startChunkedTransfer();
-            } else {
-                alert("Guest has denied your request.");
+        // Sincronização de Estados e Metadados de Arquivo
+        if (packet.type === 'emf_sync_state') {
+            if (packet.sender !== myId) {
+                updateGuestStatusUI(packet.status, packet.totalSize, packet.fileCount, packet.files);
             }
         }
 
-        // Recepção de pedaços (Chunks) do arquivo compactado
-        if (p.type === 'emf_chunk' && p.sender !== myId) {
-            handleIncomingChunk(p);
+        // Recebimento de requisição de envio
+        if (packet.type === 'emf_transfer_request' && packet.sender !== myId) {
+            showIncomingRequestModal(packet.fileCount, packet.totalSize);
+        }
+
+        // Resposta da transferência
+        if (packet.type === 'emf_transfer_response') {
+            document.getElementById('modal-waiting-accept').style.display = 'none';
+            if (packet.accepted) {
+                startStreamingChunks();
+            } else {
+                alert("Guest has denied your request.");
+                isCurrentlySending = false;
+                resetProgressUI();
+            }
+        }
+
+        // Recebimento de fatias de arquivos
+        if (packet.type === 'emf_chunk' && packet.sender !== myId) {
+            handleIncomingChunk(packet);
         }
     });
 
-    function goToOnServerPanel() {
-        document.getElementById('screen-main').style.display = 'none';
+    function enterDashboard() {
+        document.getElementById('screen-menu').style.display = 'none';
         document.getElementById('screen-waiting').style.display = 'none';
-        document.getElementById('screen-onserver').style.display = 'flex';
-        syncState("ONLINE");
-        setupTrackingStates();
+        document.getElementById('room-dashboard').style.display = 'grid';
+        
+        // Atualiza meu status para o outro
+        emitState('ONLINE');
+        
+        // Ativa detectores de atividade (Visibility API)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                emitState('INACTIVE');
+                document.getElementById('my-status').className = "status-tag tag-inactive";
+                document.getElementById('my-status').innerText = "INACTIVE";
+            } else {
+                emitState('ONLINE');
+                document.getElementById('my-status').className = "status-tag tag-online";
+                document.getElementById('my-status').innerText = "ONLINE";
+            }
+        });
     }
 
-    // --- FILE SELECT SYSTEM ---
-    function triggerFileInput(type) {
-        syncState("UPLOADING");
-        if (type === 'files') {
-            document.getElementById('picker-files').click();
-        } else {
-            document.getElementById('picker-folder').click();
-        }
-    }
-
-    function handleFileSelection(event) {
+    // --- FILE SELECTION & METADATA ---
+    function handleFileSelect(event) {
         const files = event.target.files;
-        for (let i = 0; i < files.length; i++) {
-            selectedFiles.push(files[i]);
+        if (!files.length) return;
+
+        emitState('UPLOADING FILES');
+        document.getElementById('my-status').className = "status-tag tag-upload";
+        document.getElementById('my-status').innerText = "UPLOADING FILES";
+
+        for (let file of files) {
+            // Seletor limitado a 10GB individuais
+            if (file.size > 10 * 1024 * 1024 * 1024) {
+                alert(`File ${file.name} exceeds the 10GB limit.`);
+                continue;
+            }
+            localFilesList.push(file);
         }
+
+        emitState('ONLINE');
+        document.getElementById('my-status').className = "status-tag tag-online";
+        document.getElementById('my-status').innerText = "ONLINE";
+
         renderMyFiles();
-        syncState("ONLINE");
     }
 
-    function removeMyFile(index) {
-        selectedFiles.splice(index, 1);
+    function removeLocalFile(idx) {
+        localFilesList.splice(idx, 1);
         renderMyFiles();
-        syncState("ONLINE");
     }
 
     function renderMyFiles() {
         const list = document.getElementById('my-files-list');
         list.innerHTML = "";
-        let total = 0;
-        
-        selectedFiles.forEach((file, i) => {
-            total += file.size;
+        let totalSize = 0;
+
+        localFilesList.forEach((file, idx) => {
+            totalSize += file.size;
             const div = document.createElement('div');
-            div.className = 'file-item';
+            div.className = "file-item";
             div.innerHTML = `
-                <span>${file.name} (${formatSize(file.size)})</span>
-                <span class="file-remove" onclick="removeMyFile(${i})">✖</span>
+                <span>${file.name} (${formatBytes(file.size)})</span>
+                <span class="remove-btn" onclick="removeLocalFile(${idx})">✖</span>
             `;
             list.appendChild(div);
         });
 
-        document.getElementById('my-size').innerText = formatSize(total);
-        document.getElementById('my-count').innerText = `${selectedFiles.length} files`;
+        document.getElementById('my-stats-detail').innerText = `${localFilesList.length} files (${formatBytes(totalSize)})`;
+        emitState('ONLINE');
     }
 
-    function renderGuestFiles() {
-        const list = document.getElementById('guest-files-list');
-        list.innerHTML = "";
-        guestFiles.forEach(file => {
-            const div = document.createElement('div');
-            div.className = 'file-item';
-            div.innerHTML = `<span>${file.name} (${formatSize(file.size)})</span>`;
-            list.appendChild(div);
-        });
-    }
+    function emitState(currentStatus) {
+        let totalSize = localFilesList.reduce((acc, f) => acc + f.size, 0);
+        let filesMetadata = localFilesList.map(f => ({ name: f.name, size: f.size }));
 
-    // --- TRANSFER SYSTEM IN CHUNKS (Avoids packet limit) ---
-    let countdownInterval;
-    function showReceivePopup(count, size) {
-        document.getElementById('receive-text').innerText = `Your Guest wants to send you ${count} files, and the download size will be ${formatSize(size)}. Will you accept?`;
-        document.getElementById('popup-receive').style.display = 'flex';
-
-        let countSecs = 15;
-        document.getElementById('countdown-text').innerText = `${countSecs}s remaining`;
-        
-        countdownInterval = setInterval(() => {
-            countSecs--;
-            document.getElementById('countdown-text').innerText = `${countSecs}s remaining`;
-            if (countSecs <= 0) {
-                clearInterval(countdownInterval);
-                respondTransfer(false);
-            }
-        }, 1000);
-    }
-
-    function respondTransfer(accepted) {
-        clearInterval(countdownInterval);
-        document.getElementById('popup-receive').style.display = 'none';
-        
-        safeEmit('RemoteEvent', {
-            type: 'emf_transfer_response',
+        socket.emit('RemoteEvent', {
+            type: 'emf_sync_state',
             room: myRoom,
             sender: myId,
-            accepted: accepted
+            status: currentStatus,
+            totalSize: totalSize,
+            fileCount: localFilesList.length,
+            files: filesMetadata
         });
+    }
 
-        if (accepted) {
-            // Abre o modal de progresso no recebedor
-            document.getElementById('progress-title').innerText = "Downloading...";
-            document.getElementById('progress-bar').style.width = "0%";
-            document.getElementById('progress-bar').classList.remove('failed');
-            document.getElementById('progress-percent').innerText = "0%";
-            document.getElementById('popup-progress').style.display = 'flex';
-            incomingZipBuffer = [];
-            expectedChunks = 0;
+    function updateGuestStatusUI(status, totalSize, fileCount, files) {
+        const tag = document.getElementById('guest-status');
+        tag.innerText = status;
+        
+        if (status === 'ONLINE') tag.className = "status-tag tag-online";
+        else if (status === 'INACTIVE') tag.className = "status-tag tag-inactive";
+        else if (status === 'UPLOADING FILES') tag.className = "status-tag tag-upload";
+        else tag.className = "status-tag tag-offline";
+
+        document.getElementById('guest-stats-detail').innerText = `${fileCount} files (${formatBytes(totalSize)})`;
+
+        // Renderiza lista do convidado
+        const list = document.getElementById('guest-files-list');
+        list.innerHTML = "";
+        if (files) {
+            files.forEach(f => {
+                const div = document.createElement('div');
+                div.className = "file-item";
+                div.innerHTML = `<span>${f.name} (${formatBytes(f.size)})</span>`;
+                list.appendChild(div);
+            });
         }
     }
 
-    function initiateSend() {
-        if (selectedFiles.length === 0) return alert("Select files before sending!");
-        
-        let totalSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
-        if (totalSize > 10 * 1024 * 1024 * 1024) return alert("Total size cannot exceed 10GB.");
+    // --- SENDER TRANSFER DRIVERS ---
+    async function requestSend() {
+        if (isCurrentlySending) return;
+        if (localFilesList.length === 0) return alert("Please select some files first.");
 
-        document.getElementById('popup-wait').style.display = 'flex';
-        
-        safeEmit('RemoteEvent', {
+        isCurrentlySending = true;
+        document.getElementById('modal-waiting-accept').style.display = 'flex';
+
+        let totalSize = localFilesList.reduce((acc, f) => acc + f.size, 0);
+        socket.emit('RemoteEvent', {
             type: 'emf_transfer_request',
             room: myRoom,
             sender: myId,
-            fileCount: selectedFiles.length,
+            fileCount: localFilesList.length,
             totalSize: totalSize
         });
     }
 
-    async function startChunkedTransfer() {
-        document.getElementById('progress-title').innerText = "Uploading & Zipping...";
-        document.getElementById('progress-bar').style.width = "0%";
-        document.getElementById('progress-bar').classList.remove('failed');
-        document.getElementById('progress-percent').innerText = "0%";
-        document.getElementById('popup-progress').style.display = 'flex';
+    async function startStreamingChunks() {
+        document.getElementById('modal-progress').style.display = 'flex';
+        document.getElementById('progress-title').innerText = "ZIPING AND COMPRESSING DATABASE";
+        document.getElementById('progress-status').innerText = "Writing stream buffers...";
 
-        // Bloqueia botões de envio adicionais
-        document.getElementById('send-btn').disabled = true;
+        // Cria o ZIP
+        const zip = new JSZip();
+        localFilesList.forEach(file => {
+            zip.file(file.name, file);
+        });
 
-        try {
-            const zip = new JSZip();
-            selectedFiles.forEach(file => {
-                zip.file(file.name, file);
-            });
-
-            const content = await zip.generateAsync({ type: "base64" });
-            const chunkSize = 64000; // 64KB por pacote para estabilidade
-            const totalChunks = Math.ceil(content.length / chunkSize);
-
-            for (let i = 0; i < totalChunks; i++) {
-                const chunk = content.substr(i * chunkSize, chunkSize);
-                
-                // Envia pacote sequencialmente
-                safeEmit('RemoteEvent', {
-                    type: 'emf_chunk',
-                    room: myRoom,
-                    sender: myId,
-                    chunkIndex: i,
-                    totalChunks: totalChunks,
-                    data: chunk
-                });
-
-                // Atualiza barra local de progresso de upload
-                const pct = Math.floor(((i + 1) / totalChunks) * 100);
-                document.getElementById('progress-bar').style.width = `${pct}%`;
-                document.getElementById('progress-percent').innerText = `${pct}%`;
-                
-                await new Promise(r => setTimeout(r, 40)); // Throttle para não sobrecarregar
-            }
-
-            setTimeout(() => {
-                document.getElementById('popup-progress').style.display = 'none';
-                document.getElementById('send-btn').disabled = false;
-                alert("Upload complete!");
-            }, 1000);
-
-        } catch (err) {
-            document.getElementById('progress-bar').classList.add('failed');
-            document.getElementById('progress-percent').innerText = "Failed";
-            document.getElementById('send-btn').disabled = false;
-            console.error(err);
-        }
-    }
-
-    // --- RECEBEDOR: MANIPULADOR DE CHUNKS ---
-    let incomingZipBuffer = [];
-    let expectedChunks = 0;
-
-    function handleIncomingChunk(p) {
-        incomingZipBuffer[p.chunkIndex] = p.data;
-        expectedChunks = p.totalChunks;
-
-        const receivedCount = Object.keys(incomingZipBuffer).length;
-        const pct = Math.floor((receivedCount / expectedChunks) * 100);
-        document.getElementById('progress-bar').style.width = `${pct}%`;
-        document.getElementById('progress-percent').innerText = `${pct}%`;
-
-        if (receivedCount === expectedChunks) {
-            // Download terminado, reconstrói o Base64 e ativa o download nativo do zip
-            const fullBase64 = incomingZipBuffer.join('');
+        const blob = await zip.generateAsync({ type: "blob" });
+        
+        // Transforma o Blob em fatias binárias
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(blob);
+        reader.onloadend = () => {
+            const buffer = reader.result;
+            const chunkSize = 512 * 1024; // Fatias seguras de 512KB
+            const totalChunks = Math.ceil(buffer.byteLength / chunkSize);
             
-            const link = document.createElement('a');
-            link.href = "data:application/zip;base64," + fullBase64;
-            link.download = "EMFsharedfiles.zip";
-            link.click();
+            document.getElementById('progress-title').innerText = "STREAMING SECURE DATA PIPE";
+            
+            let currentChunk = 0;
 
-            setTimeout(() => {
-                document.getElementById('popup-progress').style.display = 'none';
-                incomingZipBuffer = [];
-            }, 1000);
-        }
+            function sendNextChunk() {
+                if (currentChunk < totalChunks) {
+                    const start = currentChunk * chunkSize;
+                    const end = Math.min(start + chunkSize, buffer.byteLength);
+                    const sliced = buffer.slice(start, end);
+                    
+                    // Transforma em Base64 para tráfego limpo
+                    const base64Data = arrayBufferToBase64(sliced);
+
+                    socket.emit('RemoteEvent', {
+                        type: 'emf_chunk',
+                        room: myRoom,
+                        sender: myId,
+                        chunkIndex: currentChunk,
+                        totalChunks: totalChunks,
+                        data: base64Data
+                    });
+
+                    // Atualiza Barra de Progresso
+                    const percent = Math.floor((currentChunk / totalChunks) * 100);
+                    updateProgressUI(percent, `Sending packet ${currentChunk + 1}/${totalChunks}...`);
+
+                    currentChunk++;
+                    // Pequena pausa (throttle) para liberar a thread do processador do celular
+                    setTimeout(sendNextChunk, 15);
+                } else {
+                    updateProgressUI(100, "Transfer complete!");
+                    setTimeout(() => {
+                        document.getElementById('modal-progress').style.display = 'none';
+                        isCurrentlySending = false;
+                        resetProgressUI();
+                    }, 2000);
+                }
+            }
+            sendNextChunk();
+        };
     }
 
-    // --- STATE TRACKERS ---
-    function syncState(customStatus) {
-        if (!myRoom) return;
-        const fileData = selectedFiles.map(f => ({ name: f.name, size: f.size }));
-        const totalSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
+    // --- RECEIVER TRANSFER DRIVERS ---
+    function showIncomingRequestModal(fileCount, totalSize) {
+        document.getElementById('modal-incoming-request').style.display = 'flex';
+        document.getElementById('incoming-text').innerText = `Your Guest wants to send you ${fileCount} files, and the download size will be ${formatBytes(totalSize)}. Will you accept?`;
+        
+        let timeLeft = 15;
+        document.getElementById('timer-text').innerText = `(${timeLeft}s remaining)`;
+        
+        clearInterval(countdownInterval);
+        countdownInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer-text').innerText = `(${timeLeft}s remaining)`;
+            if (timeLeft <= 0) {
+                clearInterval(countdownInterval);
+                denyTransfer();
+            }
+        }, 1000);
+    }
 
-        safeEmit('RemoteEvent', {
-            type: 'emf_sync',
+    function acceptTransfer() {
+        clearInterval(countdownInterval);
+        document.getElementById('modal-incoming-request').style.display = 'none';
+        document.getElementById('modal-progress').style.display = 'flex';
+        document.getElementById('progress-title').innerText = "RECEIVING DATA INBOUND";
+        document.getElementById('progress-status').innerText = "Awaiting first data packets...";
+
+        expectedChunks = 0;
+        receivedChunks = [];
+
+        socket.emit('RemoteEvent', {
+            type: 'emf_transfer_response',
             room: myRoom,
             sender: myId,
-            status: customStatus || "ONLINE",
-            files: fileData,
-            totalSize: totalSize,
-            fileCount: selectedFiles.length
+            accepted: true
         });
     }
 
-    function setupTrackingStates() {
-        // Detecção de inatividade (Minimizar a aba)
-        document.addEventListener('visibilitychange', () => {
-            const status = document.hidden ? "INACTIVE" : "ONLINE";
-            document.getElementById('my-status').innerText = `[${status}]`;
-            syncState(status);
+    function denyTransfer() {
+        clearInterval(countdownInterval);
+        document.getElementById('modal-incoming-request').style.display = 'none';
+        socket.emit('RemoteEvent', {
+            type: 'emf_transfer_response',
+            room: myRoom,
+            sender: myId,
+            accepted: false
         });
+    }
+
+    function handleIncomingChunk(packet) {
+        const chunkIndex = packet.chunkIndex;
+        const totalChunks = packet.totalChunks;
         
-        // Loop de sincronização periódica (Batimento de presença a cada 3s)
-        setInterval(() => {
-            if (gameActive) syncState();
-        }, 3000);
+        receivedChunks[chunkIndex] = base64ToArrayBuffer(packet.data);
+
+        const percent = Math.floor((Object.keys(receivedChunks).length / totalChunks) * 100);
+        updateProgressUI(percent, `Assembling packet ${Object.keys(receivedChunks).length}/${totalChunks}...`);
+
+        if (Object.keys(receivedChunks).length === totalChunks) {
+            // Joga todos os pedaços recebidos em um único Blob de download
+            const blob = new Blob(receivedChunks, { type: "application/zip" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "EMFsharedfiles.zip";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            updateProgressUI(100, "Download Finished!");
+            setTimeout(() => {
+                document.getElementById('modal-progress').style.display = 'none';
+                resetProgressUI();
+            }, 2000);
+        }
     }
 
-    // --- UTILS ---
-    function formatSize(bytes) {
-        if (bytes === 0) return '0 KB';
+    // --- HELPERS E DRIVERS VISUAIS ---
+    function updateProgressUI(percent, statusText) {
+        document.getElementById('progress-fill').style.width = `${percent}%`;
+        document.getElementById('progress-percent').innerText = `${percent}%`;
+        document.getElementById('progress-status').innerText = statusText;
+    }
+
+    function resetProgressUI() {
+        document.getElementById('progress-fill').style.width = `0%`;
+        document.getElementById('progress-percent').innerText = `0%`;
+        document.getElementById('progress-fill').classList.remove('error');
+    }
+
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
         const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
     }
 
-    function copyCode() {
-        const code = document.getElementById('share-code').innerText;
-        navigator.clipboard.writeText(code);
-        alert("Room code copied to clipboard!");
+    function arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
     }
 
-    function leaveServer() {
-        safeEmit('RemoteEvent', { type: 'emf_leave', room: myRoom, sender: myId });
-        location.reload();
+    function base64ToArrayBuffer(base64) {
+        const binary_string = window.atob(base64);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binary_string.charCodeAt(i);
+        }
+        return bytes.buffer;
     }
+
+    function showNotif(text) {
+        const notif = document.createElement('div');
+        notif.className = 'notif';
+        notif.style.cssText = 'position:fixed; bottom:20px; right:20px; background:var(--panel); border:1px solid var(--neon-blue); padding:10px 20px; border-radius:4px; z-index:2000; box-shadow:0 0 10px var(--neon-blue);';
+        notif.innerText = text;
+        document.body.appendChild(notif);
+        setTimeout(() => notif.remove(), 3000);
+    }
+
+    // Configuração dos eventos de drag & drop
+    const dropzone = document.getElementById('dropzone');
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.style.borderColor = "var(--neon-blue)"; });
+    dropzone.addEventListener('dragleave', () => { dropzone.style.borderColor = "var(--border)"; });
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = "var(--border)";
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            handleFileSelect({ target: { files: files } });
+        }
+    });
 </script>
 </body>
 </html>
