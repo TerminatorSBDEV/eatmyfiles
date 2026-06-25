@@ -162,8 +162,8 @@
             </p>
             
             <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-                <!-- Google ReCaptcha v2 Widget -->
-                <div class="g-recaptcha" data-sitekey="6LdZOTMtAAAAAKuZgCaCK1YoYFgJ_7yLidAQ2-Ti" data-callback="onCaptchaSolved"></div>
+                <!-- Google ReCaptcha v2 Widget (ATUALIZADO COM SUA NOVA CHAVE) -->
+                <div class="g-recaptcha" data-sitekey="6Lf8VTMtAAAAAAMXrs6lk-tLBjuW0u8ZV5LevzMz" data-callback="onCaptchaSolved"></div>
             </div>
 
             <button id="entry-btn" class="btn" disabled onclick="goLobby()">Enter Network</button>
@@ -272,21 +272,21 @@
     let isConnected = false;
     let localStatus = "ONLINE";
     let guestStatus = "OFFLINE";
-    let stagedFiles = []; // Armazena os arquivos físicos locais selecionados
+    let stagedFiles = []; 
     let guestMetadata = { size: 0, count: 0, files: [] };
     
     // Watchdogs de Conexão
     let guestHeartbeatTimer = null;
     let heartbeatSenderTimer = null;
 
-    // Fila estrita de Transmissão (Máx 15 requisições por segundo)
+    // Fila de transmissão (Máx 15 reqs/s)
     const rateLimitQueue = [];
     setInterval(() => {
         if (rateLimitQueue.length > 0) {
             const payload = rateLimitQueue.shift();
             socket.emit('RemoteEvent', payload);
         }
-    }, 70); // ~14.2 requisições por segundo (dentro da meta de < 15/s)
+    }, 70); 
 
     function limitEmit(packet) {
         rateLimitQueue.push(packet);
@@ -304,7 +304,6 @@
 
     // --- PRESENCE WATCHDOGS ---
     function startHeartbeatSystem() {
-        // Envia presença local a cada 3 segundos
         heartbeatSenderTimer = setInterval(() => {
             if (!myRoom) return;
             limitEmit({
@@ -322,7 +321,7 @@
         clearInterval(guestHeartbeatTimer);
     }
 
-    // --- MONITORAMENTO DE ESTADO DO USUÁRIO ---
+    // --- MONITORAMENTO DE ESTADO ---
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             updateMyStatus('INACTIVE');
@@ -343,7 +342,6 @@
         el.innerText = newStatus;
         el.className = "status-val " + newStatus.toLowerCase().replace(' ', '-');
         
-        // Envia alteração imediata
         if (myRoom) {
             limitEmit({
                 type: 'emf_presence',
@@ -360,12 +358,11 @@
         document.getElementById(id).click();
     }
 
-    // --- FILE EXPLORER HANDLERS ---
+    // --- FILE SELECTION ---
     function handleFileSelection(event) {
         const files = event.target.files;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            // Se foi adicionado via pasta, preservamos o caminho relativo
             file.relativePath = file.webkitRelativePath || file.name;
             stagedFiles.push(file);
         }
@@ -421,7 +418,7 @@
 
     // --- LOBBY ENGINE ---
     function createServer() {
-        myRoom = Math.random().toString(36).substring(2, 10).toUpperCase(); // 8 caracteres
+        myRoom = Math.random().toString(36).substring(2, 10).toUpperCase(); 
         startServerView();
     }
 
@@ -457,15 +454,12 @@
     // --- NETWORK RECEIVER ---
     let incomingTransferPayload = null;
     let receiveTimeout = null;
-
-    // Chunks de download temporários
     let receivedChunks = [];
     let expectedChunksTotal = 0;
 
     socket.on('RemoteEvent', (packet) => {
         if (packet.room !== myRoom) return;
 
-        // Sincronização de Presença
         if (packet.type === 'emf_presence') {
             guestStatus = packet.status;
             const el = document.getElementById('guest-status');
@@ -475,15 +469,13 @@
             document.getElementById('guest-size').innerText = packet.size;
             document.getElementById('guest-count').innerText = `${packet.count} files`;
 
-            // Reset do Watchdog
             clearTimeout(guestHeartbeatTimer);
             guestHeartbeatTimer = setTimeout(() => {
                 document.getElementById('guest-status').innerText = "OFFLINE";
                 document.getElementById('guest-status').className = "status-val offline";
-            }, 10000); // 10s timeout
+            }, 10000); 
         }
 
-        // Sincronização de Lista de Arquivos
         if (packet.type === 'emf_file_list') {
             const container = document.getElementById('guest-file-list');
             container.innerHTML = "";
@@ -499,7 +491,6 @@
             });
         }
 
-        // Solicitação de Transferência Recebida
         if (packet.type === 'emf_transfer_request') {
             incomingTransferPayload = packet;
             document.getElementById('receive-desc').innerText = `Your Guest wants to send you ${packet.count} files, and the download size will be ${packet.size}. Will you accept?`;
@@ -516,12 +507,11 @@
                 document.getElementById('countdown').innerText = countdown;
                 if (countdown <= 0) {
                     clearInterval(receiveTimeout);
-                    respondTransfer(false); // Recusa automática por timeout
+                    respondTransfer(false); 
                 }
             }, 1000);
         }
 
-        // Resposta da Transferência (Para o remetente)
         if (packet.type === 'emf_transfer_response') {
             document.getElementById('modal-waiting').style.display = 'none';
             if (packet.accepted) {
@@ -531,7 +521,6 @@
             }
         }
 
-        // Chunk de Dados Recebido
         if (packet.type === 'emf_chunk') {
             receivedChunks[packet.index] = packet.data;
             
@@ -543,13 +532,12 @@
             }
         }
 
-        // Erro na pipeline de dados
         if (packet.type === 'emf_transfer_error') {
             showProgressError(packet.msg);
         }
     });
 
-    // --- PIPELINE DE TRANSFERÊNCIA (ZIP + RATE LIMIT CHUNKING) ---
+    // --- PIPELINE DE TRANSFERÊNCIA ---
     function requestTransfer() {
         if (stagedFiles.length === 0) {
             alert("Por favor, adicione arquivos antes de enviar.");
@@ -575,7 +563,7 @@
         });
 
         if (accepted) {
-            expectedChunksTotal = incomingTransferPayload.count; // Usamos o count como inicial de segurança
+            expectedChunksTotal = incomingTransferPayload.count; 
             receivedChunks = [];
             document.getElementById('progress-title').innerText = "Downloading Files";
             document.getElementById('modal-progress').style.display = 'flex';
@@ -588,7 +576,6 @@
         document.getElementById('modal-progress').style.display = 'flex';
         updateProgressBar(0, "Compiling package...");
 
-        // Bloqueia novos envios durante a transmissão
         document.getElementById('send-btn').disabled = true;
 
         try {
@@ -600,24 +587,19 @@
             const content = await zip.generateAsync({ type: "blob" });
             const arrayBuffer = await content.arrayBuffer();
 
-            // Fatiador em chunks de 64KB
             const CHUNK_SIZE = 64 * 1024; 
             const totalChunks = Math.ceil(arrayBuffer.byteLength / CHUNK_SIZE);
 
-            // Avisa o cliente receptor sobre o número total de chunks reais
             limitEmit({
                 type: 'emf_chunk_metadata',
                 room: myRoom,
                 total: totalChunks
             });
 
-            // Implementação do buffer com o limitador estrito de 15 Hz
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * CHUNK_SIZE;
                 const end = Math.min(start + CHUNK_SIZE, arrayBuffer.byteLength);
                 const chunkData = arrayBuffer.slice(start, end);
-                
-                // Conversão rápida de ArrayBuffer para Base64
                 const base64Data = arrayBufferToBase64(chunkData);
 
                 rateLimitQueue.push({
@@ -629,7 +611,6 @@
                 });
             }
 
-            // Monitora o progresso local baseado na fila pendente
             const initialQueueLength = rateLimitQueue.length;
             const progressInterval = setInterval(() => {
                 const sent = initialQueueLength - rateLimitQueue.length;
@@ -653,7 +634,6 @@
         }
     }
 
-    // Receptor atualiza o total real de chunks assim que recebe o metadado
     socket.on('RemoteEvent', (packet) => {
         if (packet.type === 'emf_chunk_metadata' && packet.room === myRoom) {
             expectedChunksTotal = packet.total;
@@ -664,7 +644,6 @@
         updateProgressBar(100, "Assembling pipeline...");
         
         try {
-            // Reconstrói as fatias Base64 em blocos binários
             const byteArrays = receivedChunks.map(base64 => {
                 const binaryString = atob(base64);
                 const len = binaryString.length;
