@@ -8,8 +8,8 @@
     <style>
         :root {
             --bg: #09090b;
-            --panel: #18181b;
-            --border: #27272a;
+            --panel: #121214;
+            --border: #222226;
             --accent: #00ff88;
             --accent-dim: rgba(0, 255, 136, 0.15);
             --blue: #58a6ff;
@@ -21,10 +21,11 @@
             margin: 0; padding: 0; height: 100%;
             background-color: var(--bg); color: var(--text);
             font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex; align-items: center; justify-content: center;
             overflow: hidden; touch-action: none;
         }
 
-        /* Telas de Bloqueio / Overlay */
+        /* Modals / Overlays */
         .overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.95);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -32,7 +33,7 @@
         }
 
         .card {
-            background: var(--panel); border: 1px solid var(--border); padding: 35px;
+            background: var(--panel); border: 1px solid var(--border); padding: 30px;
             border-radius: 12px; width: 90%; max-width: 450px; text-align: center;
             box-shadow: 0 15px 40px rgba(0,0,0,0.8);
         }
@@ -46,13 +47,13 @@
         .chat-layout {
             display: flex; flex-direction: column; width: 100vw; height: 100vh;
             max-width: 600px; border-right: 1px solid var(--border); border-left: 1px solid var(--border);
-            background: var(--panel); margin: 0 auto;
+            background: var(--panel);
         }
 
         .chat-header {
             padding: 15px; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
-            background: #111113;
+            background: #09090b;
         }
 
         .status-dot {
@@ -67,51 +68,52 @@
             display: flex; flex-direction: column; gap: 15px;
         }
 
+        /* Elementos da Mensagem com PFP */
+        .msg-container {
+            display: flex; gap: 10px; align-items: flex-start; max-width: 85%;
+        }
+        .msg-container.me { align-self: flex-end; flex-direction: row-reverse; }
+        .msg-container.other { align-self: flex-start; }
+
+        .pfp-avatar {
+            width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
+            border: 1px solid var(--border); background: #222;
+        }
+
         .msg-bubble {
-            max-width: 85%; padding: 10px 14px; border-radius: 10px;
+            padding: 10px 14px; border-radius: 10px;
             font-size: 0.95rem; line-height: 1.45; word-wrap: break-word;
-            border: 1px solid var(--border); display: flex; flex-direction: column; gap: 5px;
+            border: 1px solid var(--border); background: #16161a;
+            position: relative; transition: opacity 0.2s;
         }
 
-        .msg-bubble .header-msg {
-            display: flex; align-items: center; gap: 8px; margin-bottom: 2px;
+        /* Transparência Dinâmica para Envio Pendente */
+        .msg-bubble.pending { opacity: 0.5; } /* 50% de transparência durante o envio [5] */
+        .msg-bubble.sent { opacity: 1; } /* 0% de transparência ao ser enviada [5] */
+
+        .msg-container.me .msg-bubble {
+            background: #152219; border-color: var(--accent-dim);
+            border-top-right-radius: 2px;
+        }
+        .msg-container.other .msg-bubble {
+            border-top-left-radius: 2px;
         }
 
-        .msg-bubble .user-pfp {
-            width: 24px; height: 24px; border-radius: 50%; object-fit: cover;
-            border: 1px solid var(--border);
+        .msg-bubble .sender-name {
+            font-size: 0.75rem; font-weight: bold; color: var(--blue); margin-bottom: 4px;
         }
+        .msg-container.me .sender-name { color: var(--accent); }
 
-        .msg-bubble.me {
-            align-self: flex-end; background: #1c2e22; border-color: var(--accent-dim);
-            border-bottom-right-radius: 2px;
-        }
-
-        .msg-bubble.other {
-            align-self: flex-start; background: #18181b;
-            border-bottom-left-radius: 2px;
-        }
-
-        /* --- ESTILO MATRIX DO OWNER --- */
-        .msg-bubble.matrix {
+        /* Estilo Matrix para o Owner */
+        .msg-container.owner-msg .msg-bubble {
             background: #000000 !important;
-            border: 1px solid var(--accent) !important;
-            box-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
-            font-family: 'Courier New', Courier, monospace;
-            color: var(--accent) !important;
+            color: #00ff66 !important;
+            border: 1px solid #00ff66 !important;
+            font-family: 'Courier New', Courier, monospace !important;
+            text-shadow: 0 0 5px #00ff66;
+            box-shadow: 0 0 8px rgba(0, 255, 102, 0.3);
         }
-        .msg-bubble.matrix .sender-id {
-            color: var(--accent) !important;
-            text-shadow: 0 0 5px var(--accent);
-            font-weight: 900;
-        }
-
-        .msg-bubble .sender-id {
-            font-size: 0.7rem; font-family: monospace; font-weight: bold;
-            color: var(--blue);
-        }
-
-        .msg-bubble.me .sender-id { color: var(--accent); }
+        .msg-container.owner-msg .sender-name { color: #00ff66 !important; }
 
         .system-msg {
             text-align: center; font-size: 0.8rem; color: #71717a;
@@ -120,16 +122,16 @@
 
         #typing-indicator {
             padding: 5px 20px; font-size: 0.8rem; color: var(--accent);
-            font-style: italic; min-height: 20px; background: #111113;
+            font-style: italic; min-height: 20px; background: #09090b;
         }
 
         .input-bar {
             padding: 15px; border-top: 1px solid var(--border);
-            background: #111113; display: flex; gap: 10px; align-items: center;
+            background: #09090b; display: flex; gap: 8px; align-items: center;
         }
 
         input {
-            flex-grow: 1; background: #09090b; border: 1px solid var(--border);
+            flex-grow: 1; background: #020204; border: 1px solid var(--border);
             color: white; padding: 12px; border-radius: 8px; outline: none;
             font-size: 0.95rem; font-family: monospace;
         }
@@ -145,23 +147,12 @@
             background: transparent; border: 1px solid var(--border);
             color: var(--text); padding: 10px; border-radius: 8px; cursor: pointer;
             font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+            width: 42px; height: 42px; box-sizing: border-box;
         }
         .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-        /* Barra de Progresso Local de Chunks */
-        .chunk-loader-bar {
-            width: 100%; height: 6px; background: #000; border-radius: 3px;
-            overflow: hidden; margin-top: 4px; display: none;
-        }
-        .chunk-loader-fill {
-            width: 0%; height: 100%; background: var(--accent); transition: width 0.1s ease;
-        }
-
-        .settings-grid {
-            text-align: left; display: flex; flex-direction: column; gap: 12px; margin: 20px 0;
-        }
-        .settings-item { display: flex; flex-direction: column; gap: 4px; }
-        .settings-item label { font-size: 0.75rem; color: #a1a1aa; text-transform: uppercase; font-weight: bold; }
+        .setup-row { display: flex; gap: 10px; margin-top: 5px; }
+        .setup-row input { text-align: left; }
     </style>
 </head>
 <body>
@@ -185,26 +176,24 @@
         </div>
     </div>
 
-    <!-- Interface Profile Changer -->
+    <!-- Modal do Perfil -->
     <div id="modal-profile" class="overlay" style="display:none;">
-        <div class="card" style="width:340px;">
-            <h3>Change Profile</h3>
-            <div class="settings-grid">
-                <div class="settings-item" style="align-items:center;">
-                    <label>your pfp:</label>
-                    <div style="position:relative; width:64px; height:64px; border-radius:50%; background:#000; border:1px solid var(--border); overflow:hidden; cursor:pointer;" onclick="triggerPfpInput()">
-                        <img id="pfp-preview" style="width:100%; height:100%; object-fit:cover; display:none;">
-                        <span id="pfp-placeholder" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:0.75rem; text-align:center; color:#888;">No PFP</span>
-                    </div>
-                    <input type="file" id="pfp-file" accept="image/*" style="display:none;" onchange="loadPfpPreview(this)">
+        <div class="card" style="max-width: 380px;">
+            <h3>Update Profile</h3>
+            <div class="setup-row" style="flex-direction: column; text-align: left; gap: 10px; margin: 15px 0;">
+                <label style="font-size: 0.75rem; color: #888;">YOUR AVATAR (PFP)</label>
+                <button class="btn btn-secondary" type="button" onclick="triggerPfpUpload()">[Click to Choose Image]</button>
+                <input type="file" id="pfp-input" accept="image/*" style="display:none;" onchange="handlePfpSelect(this)">
+                
+                <div style="display:flex; justify-content:center; margin: 5px 0;">
+                    <img id="profile-preview-pfp" class="pfp-avatar" style="width:60px; height:60px;" src="">
                 </div>
-                <div class="settings-item">
-                    <label>your name (max 20 chars):</label>
-                    <input type="text" id="pfp-name" placeholder="Leave blank for your id" maxlength="20" style="background:#000; border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px;">
-                </div>
+
+                <label style="font-size: 0.75rem; color: #888;">YOUR NAME (MAX 20 CHARS)</label>
+                <input type="text" id="profile-name-input" placeholder="Leave blank for your ID" maxlength="20">
             </div>
-            <button class="btn" type="button" onclick="updateProfile()">[UPDATE PROFILE]</button>
-            <button class="btn btn-secondary" type="button" onclick="closeProfileModal()">Cancel</button>
+            <button class="btn btn-blue" onclick="updateProfileSubmit()">[UPDATE PROFILE]</button>
+            <button class="btn btn-secondary" onclick="closeProfileModal()">Cancel</button>
         </div>
     </div>
 
@@ -218,35 +207,38 @@
                 </div>
                 <div style="font-size:0.75rem; color:#888;">people on this site: <span id="site-users-count" style="color:var(--blue); font-weight:bold;">0</span></div>
             </div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto; background:var(--panel); border:1px solid var(--border); color:white;" onclick="openProfileModal()">Change Profile</button>
-                <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto;" onclick="copyMyId()">Copy ID</button>
-            </div>
+            <!-- Botão de Trocar Perfil -->
+            <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto;" onclick="openProfileModal()">Change Profile</button>
         </div>
 
         <div id="chat-messages" class="chat-messages">
-            <div class="system-msg">[System] Conectado ao chat global. Pronto para transmissões em tempo real.</div>
+            <div class="system-msg">[System] Conectado ao chat global em tempo real.</div>
         </div>
 
         <div id="typing-indicator"></div>
 
         <div class="input-bar">
-            <!-- 3. Botões de upload de mídias (Vídeo/GIF, Imagem, Áudio) -->
-            <button class="icon-btn" onclick="triggerMediaUpload('video')">🎥</button>
-            <button class="icon-btn" onclick="triggerMediaUpload('image')">📷</button>
-            <button class="icon-btn" onclick="triggerMediaUpload('audio')">🎶</button>
+            <!-- Botão de Vídeos/GIFs -->
+            <button class="icon-btn" onclick="triggerVideoUpload()">🎥</button>
+            <input type="file" id="video-input" accept="video/*,image/gif" style="display:none;" onchange="handleMediaSelect(this, 'video')">
+
+            <!-- Botão de Fotos -->
+            <button class="icon-btn" onclick="triggerImageUpload()">📷</button>
+            <input type="file" id="image-input" accept="image/*" style="display:none;" onchange="handleImageSend(this)">
             
-            <input type="file" id="media-file-input" style="display:none;" onchange="handleMediaSelect(this)">
-            
+            <!-- Botão de Áudio -->
+            <button class="icon-btn" onclick="triggerAudioUpload()">🎶</button>
+            <input type="file" id="audio-input" accept="audio/*" style="display:none;" onchange="handleMediaSelect(this, 'audio')">
+
             <input type="text" id="chat-input" placeholder="Type a message or command..." autocomplete="off" oninput="handleTyping()">
             <button class="btn" onclick="sendMsg()">Send</button>
         </div>
     </div>
 
 <script>
-    // --- CREDENCIAIS ---
+    // --- CREDENCIAIS ATUALIZADAS ---
     const TUNNEL = "https://include-secondary-additions-resistance.trycloudflare.com";
-    const AUTH_KEY = "55c130c22c";
+    const VIRTUAL_SERVER_KEY = "55c130c22c";
     const OWNER_ID = "da0d3ac30047021752d9";
 
     let myId = getCookie("eb_owner_id") || "";
@@ -256,17 +248,26 @@
     let isConnected = false;
     
     // Perfil do Usuário
-    let myProfileName = localStorage.getItem('eb_profile_name') || "";
-    let myProfilePfp = localStorage.getItem('eb_profile_pfp') || "";
+    let myProfile = {
+        name: "",
+        avatar: "" // base64
+    };
 
     // Estados do digitador
     let isTyping = false;
     let typingTimeout = null;
     const activeTypers = new Set();
 
-    // Motor de Fatiamento (Chunked Media Upload)
-    const CHUNK_SIZE = 150 * 1024; // 150KB por pedaço para vídeos e áudios
-    const pendingReceives = {}; // Armazena temporariamente chunks recebidos por outros clientes
+    // Configurações do Chunked Upload (Vídeo/Áudio)
+    const CHUNK_SIZE = 150 * 1024; // Fatias de 150KB
+    const pendingFileChunks = {}; // fileId -> array de chunks montando no receptor
+    const activeUploads = {}; // fileId -> DOM element de progresso local
+
+    // Carrega perfil salvo localmente
+    const savedProfile = localStorage.getItem('eb_user_profile');
+    if (savedProfile) {
+        try { myProfile = JSON.parse(savedProfile); } catch(e) {}
+    }
 
     // --- CONEXÃO E IDENTIFICAÇÃO ---
     socket.on('connect', () => {
@@ -281,26 +282,18 @@
         document.getElementById('status-dot').classList.add('online');
         document.getElementById('overlay-sync').style.display = 'none';
 
-        // Carrega dados locais salvos do perfil no painel de edição
-        document.getElementById('pfp-name').value = myProfileName;
-        if (myProfilePfp) {
-            document.getElementById('pfp-preview').src = myProfilePfp;
-            document.getElementById('pfp-preview').style.display = 'block';
-            document.getElementById('pfp-placeholder').style.display = 'none';
-        }
-
         socket.emit('join_virtual_server', { key: VIRTUAL_SERVER_KEY });
     });
 
     socket.on('joined_successfully', () => {
         isConnected = true;
         
-        // Se eu for o dono, carrego apenas os banimentos do meu EBstorage físico
+        // Se eu for o dono, carrego apenas a lista de banimentos física
         if (myId === OWNER_ID) {
             socket.emit('RemoteEvent', { type: 'ebdata_fetch_bans' });
         } else {
-            // Se for espectador, apenas avisa a sala
-            socket.emit('RemoteEvent', { type: 'sync_request', senderId: myId });
+            // Solicita lista de banimentos atualizada para rede
+            socket.emit('RemoteEvent', { type: 'sync_request_bans', senderId: myId });
         }
 
         // Loop de monitoramento de usuários online no site (a cada 5s)
@@ -325,52 +318,46 @@
         document.getElementById('my-id-display').innerText = "Offline";
     });
 
-    // --- RECEBIMENTO DE EVENTOS E CHUNKS DE MÍDIA ---
+    // --- RECEBIMENTO DE EVENTOS ---
     socket.on('RemoteEvent', (packet) => {
         if (!isConnected) return;
 
-        // Trata respostas do banco físico (Banimentos)
+        // Trata respostas do banco físico (Apenas banimentos)
         if (packet.type === 'storage_response') {
             const res = packet.result;
             if (res && res.success === undefined) {
-                if (res.result && res.result.data && packet.cmd_type === 'ebdata_fetch_bans') {
-                    banList = res.result.data;
-                    checkMyBanStatus();
+                if (res.result && res.result.data) {
+                    if (packet.cmd_type === 'ebdata_fetch_bans') {
+                        banList = res.result.data;
+                        checkMyBanStatus();
+                    }
                 }
             }
         }
 
-        // P2P Sync
-        if (packet.type === 'sync_request') {
+        // Sincronização P2P de Banimentos
+        if (packet.type === 'sync_request_bans') {
             if (banList.length > 0) {
                 socket.emit('RemoteEvent', {
-                    type: 'sync_response',
+                    type: 'sync_response_bans',
                     targetId: packet.senderId,
                     banList: banList
                 });
             }
         }
 
-        if (packet.type === 'sync_response' && packet.targetId === myId) {
+        if (packet.type === 'sync_response_bans' && packet.targetId === myId) {
             banList = packet.banList || [];
             checkMyBanStatus();
         }
 
-        // Nova Mensagem de Chat (Texto / Imagem Leve)
+        // Receber Mensagem Convencional ou de Imagem Leve (Ouvir)
         if (packet.type === 'chat_msg') {
-            appendMessage({
-                userId: packet.userId,
-                userName: packet.userName,
-                userPfp: packet.userPfp,
-                text: packet.text,
-                image: packet.image,
-                mediaUrl: packet.mediaUrl,
-                mediaType: packet.mediaType
-            });
+            appendMessage(packet.userId, packet.text, packet.userId === myId, packet.image, null, null, packet.profile);
         }
 
-        // Recebimento descentralizado de fatias de mídia (Vídeo / Áudio pesado)
-        if (packet.type === 'media_chunk') {
+        // Receber Pedaços de Arquivos Grandes (Vídeo/Áudio) e Reconstruir
+        if (packet.type === 'chat_media_chunk') {
             handleIncomingMediaChunk(packet);
         }
 
@@ -392,10 +379,6 @@
         if (packet.type === 'unban_broadcast') {
             banList = banList.filter(id => id !== packet.targetId);
         }
-
-        if (packet.type === 'clear_broadcast') {
-            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico do chat foi limpo pelo moderador.</div>`;
-        }
     });
 
     // --- LOGICA DE DIGITAÇÃO ---
@@ -404,6 +387,7 @@
             isTyping = true;
             socket.emit('RemoteEvent', { type: 'typing_status', userId: myId, isTyping: true });
         }
+        
         clearTimeout(typingTimeout);
         typingTimeout = setTimeout(() => {
             isTyping = false;
@@ -422,170 +406,182 @@
         }
     }
 
-    // --- ATUALIZAÇÃO DE PERFIL ---
-    function openProfileModal() { document.getElementById('modal-profile').style.display = 'flex'; }
+    // --- CONFIGURAÇÃO E UPDATE DO PERFIL ---
+    function openProfileModal() {
+        document.getElementById('modal-profile').style.display = 'flex';
+        document.getElementById('profile-name-input').value = myProfile.name;
+        document.getElementById('profile-preview-pfp').src = myProfile.avatar || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle><path d='M8 14s1.5 2 4 2 4-2 4-2'></path><line x1='9' y1='9' x2='9.01' y2='9'></line><line x1='15' y1='9' x2='15.01' y2='9'></line></svg>";
+    }
     function closeProfileModal() { document.getElementById('modal-profile').style.display = 'none'; }
-    function triggerPfpInput() { document.getElementById('pfp-file').click(); }
-
-    function loadPfpPreview(input) {
+    function triggerPfpUpload() { document.getElementById('pfp-input').click(); }
+    
+    function handlePfpSelect(input) {
         if (input.files.length === 0) return;
         const reader = new FileReader();
         reader.onload = function(e) {
-            myProfilePfp = e.target.result;
-            document.getElementById('pfp-preview').src = myProfilePfp;
-            document.getElementById('pfp-preview').style.display = 'block';
-            document.getElementById('pfp-placeholder').style.display = 'none';
+            myProfile.avatar = e.target.result;
+            document.getElementById('profile-preview-pfp').src = e.target.result;
         };
         reader.readAsDataURL(input.files[0]);
     }
 
-    function updateProfile() {
-        myProfileName = document.getElementById('pfp-name').value.trim();
-        localStorage.setItem('eb_profile_name', myProfileName);
-        if (myProfilePfp) {
-            localStorage.setItem('eb_profile_pfp', myProfilePfp);
-        }
+    function updateProfileSubmit() {
+        myProfile.name = document.getElementById('profile-name-input').value.trim().substring(0, 20);
+        localStorage.setItem('eb_user_profile', JSON.stringify(myProfile));
         closeProfileModal();
-        alert("Profile updated successfully!");
+        addSystemMessage("Seu perfil foi atualizado com sucesso localmente.");
     }
 
-    // --- SELETOR DE MÍDIAS (IMAGEM, VÍDEO, ÁUDIO) ---
-    let uploadTargetType = "image";
-    function triggerMediaUpload(type) {
-        uploadTargetType = type;
-        const input = document.getElementById('media-file-input');
-        if (type === 'image') input.accept = "image/*";
-        else if (type === 'video') input.accept = "video/*,image/gif";
-        else if (type === 'audio') input.accept = "audio/*";
-        input.click();
-    }
+    // --- PROCESSAMENTO E ENVIO EM CHUNKS (ÁUDIO / VÍDEO) ---
+    function triggerVideoUpload() { document.getElementById('video-input').click(); }
+    function triggerAudioUpload() { document.getElementById('audio-input').click(); }
 
-    function handleMediaSelect(inputEl) {
-        if (inputEl.files.length === 0) return;
-        const file = inputEl.files[0];
+    function handleMediaSelect(input, type) {
+        if (input.files.length === 0) return;
+        const file = input.files[0];
 
-        // Limite de 10MB para Vídeos e Áudios
+        // Limite rígido de 10MB
         if (file.size > 10 * 1024 * 1024) {
-            alert("File size exceeds 10MB limit!");
-            inputEl.value = "";
+            alert("Media files must be under 10MB!");
+            input.value = "";
             return;
         }
 
         const reader = new FileReader();
         reader.onload = function(e) {
             const base64Data = e.target.result;
+            const fileId = "media_" + Date.now();
+            
+            // 1. Cria bolha de mensagem local com 50% de opacidade (Pendente) [5]
+            const tempBubble = appendMessage(myId, `Uploading ${type}... 0%`, true, null, null, type, myProfile);
+            tempBubble.classList.add('pending'); // Define transparência inicial [5]
+            activeUploads[fileId] = tempBubble;
 
-            if (uploadTargetType === 'image') {
-                // Imagens pequenas são enviadas diretamente para economizar tráfego
-                sendChatMessage("", base64Img = base64Data, null, 'image');
-            } else {
-                // Vídeos, GIFs e Áudios pesados são fatiados em chunks de 150KB
-                sliceAndSendMedia(base64Data, uploadTargetType);
-            }
-            inputEl.value = "";
+            // 2. Dispara a fila de fatiamento sequencial autônoma (150KB por fatia)
+            sendMediaChunks(base64Data, fileId, type);
+            input.value = "";
         };
         reader.readAsDataURL(file);
     }
 
-    // --- SISTEMA DE FATIVAMENTO DE MÍDIA EM SEGUNDO PLANO (CHUNKS) ---
-    function sliceAndSendMedia(base64Data, type) {
-        const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
-        const fileId = "file_" + Date.now() + Math.random().toString(36).substr(2, 4);
+    function sendMediaChunks(fullBase64, fileId, type) {
+        const total = Math.ceil(fullBase64.length / CHUNK_SIZE);
+        let index = 0;
 
-        // Cria o balão de carregamento local na minha tela de chat
-        const loadingDiv = appendMessage({
-            userId: myId, userName: myProfileName, userPfp: myProfilePfp,
-            text: `[Sending ${type} in chunks...]`,
-            mediaType: 'loading', fileId: fileId
-        });
-
-        // Envia as fatias de forma cadenciada (delay de 80ms) para contornar limitadores do servidor
-        let currentChunk = 0;
-        function sendNext() {
-            if (currentChunk < totalChunks) {
-                const start = currentChunk * CHUNK_SIZE;
-                const end = Math.min(start + CHUNK_SIZE, base64Data.length);
-                const slice = base64Data.substring(start, end);
+        function next() {
+            if (index < total) {
+                const start = index * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, fullBase64.length);
+                const chunk = fullBase64.slice(start, end);
 
                 socket.emit('RemoteEvent', {
-                    type: 'media_chunk',
-                    room: myRoom,
+                    type: 'chat_media_chunk',
+                    room: VIRTUAL_SERVER_KEY,
                     fileId: fileId,
-                    index: currentChunk,
-                    total: totalChunks,
+                    index: index,
+                    total: total,
+                    data: chunk,
                     mediaType: type,
-                    data: slice,
-                    // Dados do Perfil anexados ao primeiro chunk para identificação visual
-                    profile: { name: myProfileName, pfp: myProfilePfp, userId: myId }
+                    userId: myId,
+                    profile: myProfile
                 });
 
-                // Atualiza progresso local
-                const pct = Math.floor((currentChunk / totalChunks) * 100);
-                const bar = loadingDiv.querySelector('.chunk-loader-fill');
-                if (bar) bar.style.width = `${pct}%`;
+                // Atualiza progresso da opacidade local
+                const pct = Math.floor((index / total) * 100);
+                if (activeUploads[fileId]) {
+                    activeUploads[fileId].querySelector('.media-content-text').innerText = `Uploading ${type}... ${pct}%`;
+                }
 
-                currentChunk++;
-                setTimeout(sendNext, 80); // 80ms de intervalo de segurança
+                index++;
+                setTimeout(next, 75); // Delay seguro de 75ms (Mantém ~13 reqs/s, abaixo de 15)
             } else {
-                // Envio Concluído localmente, monta para mim mesmo no chat
-                loadingDiv.remove();
-                appendMessage({
-                    userId: myId, userName: myProfileName, userPfp: myProfilePfp,
-                    text: "", mediaUrl: base64Data, mediaType: type
-                });
+                // Sucesso! Remove a marcação pendente e recupera opacidade sólida [5]
+                const bubble = activeUploads[fileId];
+                if (bubble) {
+                    bubble.classList.remove('pending');
+                    bubble.classList.add('sent'); // Restaura para 0% de transparência (sólida) [5]
+                    
+                    // Renderiza o player final
+                    const container = bubble.querySelector('.media-content-text');
+                    container.innerHTML = "";
+                    if (type === 'video') {
+                        container.innerHTML = `<video src="${fullBase64}" controls style="max-width:100%; max-height:240px; border-radius:8px; display:block;"></video>`;
+                    } else {
+                        container.innerHTML = `<audio src="${fullBase64}" controls style="max-width:100%; display:block;"></audio>`;
+                    }
+                }
+                delete activeUploads[fileId];
             }
         }
-        sendNext();
+        next();
     }
 
-    // --- PROCESSADOR RECEPTOR DE CHUNKS P2P ---
+    // Receptor dos pedaços de mídia dos outros jogadores
     function handleIncomingMediaChunk(packet) {
-        const { fileId, index, total, data, mediaType, profile } = packet;
+        const { fileId, index, total, data, mediaType, userId, profile } = packet;
 
-        if (!pendingReceives[fileId]) {
-            // Cria o balão de download na tela dos outros espectadores
-            const loadingDiv = appendMessage({
-                userId: profile.userId, userName: profile.name, userPfp: profile.pfp,
-                text: `[Receiving ${mediaType} from client...]`,
-                mediaType: 'loading', fileId: fileId
-            });
-            pendingReceives[fileId] = {
-                chunks: Array(total).fill(null),
-                div: loadingDiv,
-                profile: profile,
-                type: mediaType
-            };
+        if (!pendingFileChunks[fileId]) {
+            pendingFileChunks[fileId] = Array(total).fill(null);
         }
 
-        const session = pendingReceives[fileId];
-        session.chunks[index] = data;
+        pendingFileChunks[fileId][index] = data;
 
-        // Atualiza a barra de progresso do download do espectador
-        const received = session.chunks.filter(c => c !== null).length;
-        const pct = Math.floor((received / total) * 100);
-        const bar = session.div.querySelector('.chunk-loader-fill');
-        if (bar) bar.style.width = `${pct}%`;
+        // Se estiver completo, remonta
+        if (pendingFileChunks[fileId].every(c => c !== null)) {
+            const assembledBase64 = pendingFileChunks[fileId].join('');
+            delete pendingFileChunks[fileId];
 
-        // Se completou, remonta o arquivo e joga na tela
-        if (received === total) {
-            const assembledBase64 = session.chunks.join('');
-            session.div.remove();
-            
-            appendMessage({
-                userId: session.profile.userId, userName: session.profile.name, userPfp: session.profile.pfp,
-                text: "", mediaUrl: assembledBase64, mediaType: session.type
-            });
-
-            delete pendingReceives[fileId];
+            // Renderiza na tela para os espectadores
+            appendMessage(userId, "", userId === myId, null, assembledBase64, mediaType, profile);
         }
     }
 
-    // --- ENVIAR MENSAGEM ---
+    // --- ENVIAR FOTOS LEVES (MÁX 2MB) ---
+    function triggerImageUpload() { document.getElementById('image-input').click(); }
+    
+    function handleImageSend(input) {
+        if (input.files.length === 0) return;
+        const file = input.files[0];
+
+        if (file.size > 2 * 1024 * 1024) {
+            alert("Images sent via camera button must be under 2MB! Use video/gif button for larger ones.");
+            input.value = "";
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const base64Img = e.target.result;
+            
+            // Criar bolha pendente local [5]
+            const tempBubble = appendMessage(myId, "", true, base64Img, null, null, myProfile);
+            tempBubble.classList.add('pending');
+
+            // Envia via Socket e aguarda confirmação de entrega do Server para soltar a opacidade [5]
+            socket.emit('RemoteEvent', {
+                type: 'chat_msg',
+                userId: myId,
+                text: "",
+                image: base64Img,
+                profile: myProfile
+            }, () => {
+                // Callback de confirmação: Remove transparência [5]
+                tempBubble.classList.remove('pending');
+                tempBubble.classList.add('sent');
+            });
+
+            input.value = "";
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // --- ENVIAR TEXTO ---
     function sendMsg() {
         const input = document.getElementById('chat-input');
         let text = input.value.trim();
         if (!text) return;
 
+        // Desliga status digitando
         isTyping = false;
         clearTimeout(typingTimeout);
         socket.emit('RemoteEvent', { type: 'typing_status', userId: myId, isTyping: false });
@@ -601,27 +597,22 @@
             return;
         }
 
-        sendChatMessage(text);
-        input.value = "";
-    }
+        // Criar bolha local de texto pendente [5]
+        const tempBubble = appendMessage(myId, text, true, null, null, null, myProfile);
+        tempBubble.classList.add('pending');
 
-    function sendChatMessage(text, image, mediaUrl, mediaType) {
-        const payload = {
+        socket.emit('RemoteEvent', {
             type: 'chat_msg',
             userId: myId,
-            userName: myProfileName,
-            userPfp: myProfilePfp,
-            text: text || "",
-            image: image || null,
-            mediaUrl: mediaUrl || null,
-            mediaType: mediaType || null
-        };
-
-        socket.emit('RemoteEvent', payload);
-        appendMessage({
-            userId: myId, userName: myProfileName, userPfp: myProfilePfp,
-            text: text, image: image, mediaUrl: mediaUrl, mediaType: mediaType
+            text: text,
+            profile: myProfile
+        }, () => {
+            // Sucesso do servidor: Torna sólida [5]
+            tempBubble.classList.remove('pending');
+            tempBubble.classList.add('sent');
         });
+
+        input.value = "";
     }
 
     // --- INTERPRETADOR DE COMANDOS ---
@@ -632,24 +623,16 @@
 
         if (cmd === '/ban' && arg) {
             const resolvedId = resolvePartialUserId(arg);
-            if (!resolvedId) {
-                alert("Nenhum usuário correspondente encontrado.");
-                return;
-            }
-
-            if (resolvedId === OWNER_ID) {
-                alert("Você não pode se banir!");
-                return;
-            }
+            if (!resolvedId) return alert("Nenhum usuário correspondente.");
+            if (resolvedId === OWNER_ID) return alert("Você não pode se banir!");
 
             if (!banList.includes(resolvedId)) {
                 banList.push(resolvedId);
                 socket.emit('RemoteEvent', { type: 'ban_broadcast', targetId: resolvedId });
                 socket.emit('RemoteEvent', { type: 'ebdata_add_bans', data: banList });
-                addSystemMessage(`Jogador ${resolvedId} foi banido do servidor.`);
+                addSystemMessage(`Jogador ${resolvedId} foi banido.`);
             }
         }
-
         else if (cmd === '/unban' && arg) {
             const resolvedId = resolvePartialUserIdFromBans(arg);
             if (resolvedId) {
@@ -660,18 +643,15 @@
             }
         }
         else if (cmd === "/clear") {
+            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico foi limpo.</div>`;
             socket.emit('RemoteEvent', { type: 'clear_broadcast' });
-            socket.emit('RemoteEvent', { type: 'ebdata_clear' }); 
-            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico do chat foi limpo pelo moderador.</div>`;
         }
     }
 
     function resolvePartialUserId(partial) {
         const clean = partial.toLowerCase();
         for (let msg of chatHistory) {
-            if (msg.userId.toLowerCase().includes(clean)) {
-                return msg.userId;
-            }
+            if (msg.userId.toLowerCase().includes(clean)) return msg.userId;
         }
         return partial.length >= 10 ? partial : null;
     }
@@ -691,48 +671,62 @@
         }
     }
 
-    function appendMessage(data) {
+    // --- RENDERIZADOR VISUAL ---
+    function appendMessage(userId, text, isMe, imageBase64, mediaBase64, mediaType, profile) {
         const container = document.getElementById('chat-messages');
-        const div = document.createElement('div');
-        const isMe = data.userId === myId;
-        const isOwner = data.userId === OWNER_ID;
         
-        // Aplica o estilo MATRIX se for o OWNER
-        div.className = `msg-bubble ${isMe ? 'me' : 'other'} ${isOwner ? 'matrix' : ''}`;
+        // Elemento container que agrupa Avatar + Balão
+        const msgContainer = document.createElement('div');
+        msgContainer.className = `msg-container ${isMe ? 'me' : 'other'}`;
+        
+        // Se for o Moderador, aplica estilo Matrix especial
+        if (userId === OWNER_ID) {
+            msgContainer.classList.add('owner-msg');
+        }
+
+        // Renderiza PFP (Avatar) se existir no perfil, senão usa SVG padrão
+        const avatarSrc = (profile && profile.avatar) ? profile.avatar : "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle><path d='M8 14s1.5 2 4 2 4-2 4-2'></path><line x1='9' y1='9' x2='9.01' y2='9'></line><line x1='15' y1='9' x2='15.01' y2='9'></line></svg>";
+        const senderDisplayName = (profile && profile.name) ? profile.name : `ID: ${userId.substring(0, 10)}`;
+
+        const pfpImg = document.createElement('img');
+        pfpImg.className = 'pfp-avatar';
+        pfpImg.src = avatarSrc;
+
+        const bubble = document.createElement('div');
+        bubble.className = `msg-bubble`;
         
         let contentHtml = `
-            <div class="header-msg">
-                ${data.userPfp ? `<img src="${data.userPfp}" class="user-pfp">` : ''}
-                <div class="sender-id">${isOwner ? 'Moderador / Owner' : (data.userName || 'ID: ' + data.userId.substring(0, 10))}</div>
-            </div>
-            ${data.text ? `<div>${data.text}</div>` : ''}
+            <div class="sender-name">${userId === OWNER_ID ? 'Moderador / Owner' : senderDisplayName}</div>
+            <div class="media-content-text">${text ? `<div>${text}</div>` : ''}</div>
         `;
 
-        if (data.image) {
-            contentHtml += `<img src="${data.image}" style="max-width:100%; max-height:220px; border-radius:8px; margin-top:6px; display:block; object-fit:cover;">`;
+        if (imageBase64) {
+            contentHtml += `<img src="${imageBase64}" style="max-width:100%; max-height:220px; border-radius:8px; margin-top:6px; display:block; object-fit:cover;">`;
         }
 
-        // Renderizadores das novas mídias fatiadas
-        if (data.mediaType === 'video' && data.mediaUrl) {
-            contentHtml += `<video src="${data.mediaUrl}" controls style="max-width:100%; max-height:240px; border-radius:8px; margin-top:6px; display:block;"></video>`;
+        if (mediaBase64) {
+            if (mediaType === 'video') {
+                contentHtml += `<video src="${mediaBase64}" controls style="max-width:100%; max-height:240px; border-radius:8px; display:block; margin-top:6px;"></video>`;
+            } else if (mediaType === 'audio') {
+                contentHtml += `<audio src="${mediaBase64}" controls style="max-width:100%; display:block; margin-top:6px;"></audio>`;
+            }
         }
 
-        if (data.mediaType === 'audio' && data.mediaUrl) {
-            contentHtml += `<audio src="${data.mediaUrl}" controls style="max-width:100%; margin-top:6px; display:block;"></audio>`;
-        }
-
-        if (data.mediaType === 'loading' && data.fileId) {
-            contentHtml += `
-                <div class="chunk-loader-bar" id="bar-${data.fileId}" style="display:block;">
-                    <div class="chunk-loader-fill" id="fill-${data.fileId}"></div>
-                </div>
-            `;
-        }
-
-        div.innerHTML = contentHtml;
-        container.appendChild(div);
+        bubble.innerHTML = contentHtml;
+        msgContainer.appendChild(pfpImg);
+        msgContainer.appendChild(bubble);
+        container.appendChild(msgContainer);
         container.scrollTop = container.scrollHeight;
-        return div;
+
+        return bubble; // Retorna referência do balão para controle de opacidade
+    }
+
+    function finalizeLocalPendingMessage(fileId) {
+        const bubble = activeUploads[fileId];
+        if (bubble) {
+            bubble.classList.remove('pending');
+            bubble.classList.add('sent');
+        }
     }
 
     function addSystemMessage(text) {
@@ -742,12 +736,6 @@
         div.innerText = `[System] ${text}`;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
-    }
-
-    function copyMyId() {
-        if (!myId) return;
-        navigator.clipboard.writeText(myId);
-        alert(`ID copiado: ${myId}`);
     }
 
     // --- COOKIE HELPERS ---
