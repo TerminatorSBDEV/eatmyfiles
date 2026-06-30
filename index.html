@@ -25,7 +25,6 @@
             overflow: hidden; touch-action: none;
         }
 
-        /* Telas de Bloqueio / Overlay */
         .overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.95);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -38,13 +37,11 @@
             box-shadow: 0 15px 40px rgba(0,0,0,0.8);
         }
 
-        /* Ban Screen */
         #ban-screen {
             background: #1a0508; border: 2px solid var(--error);
             box-shadow: 0 0 30px rgba(255, 123, 114, 0.2);
         }
 
-        /* Layout Do Chat */
         .chat-layout {
             display: flex; flex-direction: column; width: 100vw; height: 100vh;
             max-width: 600px; border-right: 1px solid var(--border); border-left: 1px solid var(--border);
@@ -97,9 +94,15 @@
             margin: 10px 0; font-family: monospace;
         }
 
+        /* Indicador de Digitação */
+        #typing-indicator {
+            padding: 5px 20px; font-size: 0.8rem; color: var(--accent);
+            font-style: italic; min-height: 20px; background: #111113;
+        }
+
         .input-bar {
             padding: 15px; border-top: 1px solid var(--border);
-            background: #111113; display: flex; gap: 10px;
+            background: #111113; display: flex; gap: 10px; align-items: center;
         }
 
         input {
@@ -110,10 +113,17 @@
         input:focus { border-color: var(--blue); }
 
         .btn {
-            background: var(--accent); color: black; border: none; padding: 0 20px;
+            background: var(--accent); color: black; border: none; padding: 12px 20px;
             border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;
         }
         .btn:hover { background: #00cc6a; }
+
+        .icon-btn {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text); padding: 10px; border-radius: 8px; cursor: pointer;
+            font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+        }
+        .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
     </style>
 </head>
 <body>
@@ -140,26 +150,37 @@
     <!-- Layout do Chat Room -->
     <div class="chat-layout">
         <div class="chat-header">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <div id="status-dot" class="status-dot"></div>
-                <span style="font-weight: bold; font-size: 0.95rem;" id="my-id-display">Connecting...</span>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div id="status-dot" class="status-dot"></div>
+                    <span style="font-weight: bold; font-size: 0.95rem;" id="my-id-display">Connecting...</span>
+                </div>
+                <!-- 1. Contador de pessoas online no site -->
+                <div style="font-size:0.75rem; color:#888;">people on this site: <span id="site-users-count" style="color:var(--blue); font-weight:bold;">0</span></div>
             </div>
-            <button class="btn" style="padding:6px 12px; font-size:0.75rem;" onclick="copyMyId()">Copy ID</button>
+            <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto;" onclick="copyMyId()">Copy ID</button>
         </div>
 
         <div id="chat-messages" class="chat-messages">
             <div class="system-msg">[System] Conectado ao chat global. Carregando histórico...</div>
         </div>
 
+        <!-- 2. Alerta de digitação -->
+        <div id="typing-indicator"></div>
+
         <div class="input-bar">
-            <input type="text" id="chat-input" placeholder="Type a message or command..." autocomplete="off">
+            <!-- 3. Botão de Envio de Imagens -->
+            <button class="icon-btn" onclick="triggerImageUpload()">📷</button>
+            <input type="file" id="image-input" accept="image/*" style="display:none;" onchange="handleImageSend(this)">
+            
+            <input type="text" id="chat-input" placeholder="Type a message or command..." autocomplete="off" oninput="handleTyping()">
             <button class="btn" onclick="sendMsg()">Send</button>
         </div>
     </div>
 
 <script>
     // --- CREDENCIAIS ---
-    const TUNNEL = "https://develops-scripting-differences-precision.trycloudflare.com";
+    const TUNNEL = "https://card-green-operational-dev.trycloudflare.com";
     const VIRTUAL_SERVER_KEY = "13c25d9dae";
     const OWNER_ID = "da0d3ac30047021752d9";
 
@@ -169,7 +190,11 @@
     let banList = [];
     let chatHistory = [];
     let isConnected = false;
-    let ProcessandoIA = false; // Evitar loops de renderização
+    
+    // Estados do digitador
+    let isTyping = false;
+    let typingTimeout = null;
+    const activeTypers = new Set();
 
     // --- CONEXÃO E IDENTIFICAÇÃO ---
     socket.on('connect', () => {
@@ -184,21 +209,31 @@
         document.getElementById('status-dot').classList.add('online');
         document.getElementById('overlay-sync').style.display = 'none';
 
-        // Entrar na sala do Servidor Virtual
         socket.emit('join_virtual_server', { key: VIRTUAL_SERVER_KEY });
     });
 
     socket.on('joined_successfully', () => {
         isConnected = true;
         
-        // Se eu for o dono, carrego o histórico e a lista de banimentos direto do meu EBstorage persistente
+        // Solicita o estado das listas armazenadas fisicamente
         if (myId === OWNER_ID) {
-            socket.emit('RemoteEvent', { type: 'ebdata_fetch_global_bans' });
-            socket.emit('RemoteEvent', { type: 'ebdata_fetch_global_history' });
+            socket.emit('RemoteEvent', { type: 'ebdata_fetch_bans' });
+            socket.emit('RemoteEvent', { type: 'ebdata_fetch_history' });
         } else {
-            // Se eu for espectador, peço os dados de histórico para quem estiver online na sala
             socket.emit('RemoteEvent', { type: 'sync_request', senderId: myId });
         }
+
+        // Loop de monitoramento de usuários online no site (a cada 5s)
+        setInterval(() => {
+            if (isConnected) {
+                socket.emit('eb_heartbeat', { key: VIRTUAL_SERVER_KEY, ownerId: myId });
+            }
+        }, 5000);
+    });
+
+    socket.on('eb_heartbeat_response', (data) => {
+        // Atualiza dinamicamente o contador do header
+        document.getElementById('site-users-count').innerText = data.users;
     });
 
     socket.on('join_error', (data) => {
@@ -215,27 +250,25 @@
     socket.on('RemoteEvent', (packet) => {
         if (!isConnected) return;
 
-        // Tratar recebimento das respostas do banco de dados (EBstorage) do Dono
+        // Trata respostas do banco de dados (EBstorage.js)
         if (packet.type === 'storage_response') {
             const res = packet.result;
             if (res && res.success === undefined) {
-                // É um retorno de fetch
-                if (res.data) {
-                    if (packet.cmd_type === 'ebdata_fetch_global_bans') {
-                        banList = res.data;
+                if (res.result && res.result.data) {
+                    if (packet.cmd_type === 'ebdata_fetch_bans') {
+                        banList = res.result.data;
                         checkMyBanStatus();
                     }
-                    if (packet.cmd_type === 'ebdata_fetch_global_history') {
-                        chatHistory = res.data;
+                    if (packet.cmd_type === 'ebdata_fetch_history') {
+                        chatHistory = res.result.data;
                         renderChatHistory();
                     }
                 }
             }
         }
 
-        // P2P: Sincronização de novos usuários que entraram
+        // Sincronização P2P
         if (packet.type === 'sync_request') {
-            // Se eu tenho dados (Dono ou participante ativo), respondo enviando o histórico
             if (chatHistory.length > 0 || banList.length > 0) {
                 socket.emit('RemoteEvent', {
                     type: 'sync_response',
@@ -253,57 +286,132 @@
             renderChatHistory();
         }
 
-        // Tratar novas mensagens enviadas em tempo real
+        // Nova Mensagem (Texto ou Imagem)
         if (packet.type === 'chat_msg') {
-            chatHistory.push({ userId: packet.userId, text: packet.text });
-            appendMessage(packet.userId, packet.text, packet.userId === myId);
+            chatHistory.push({ userId: packet.userId, text: packet.text, image: packet.image });
+            appendMessage(packet.userId, packet.text, packet.userId === myId, packet.image);
+
+            if (myId === OWNER_ID) {
+                saveHistoryToDatabase();
+            }
         }
 
-        // Tratar banimento transmitido em tempo real
+        // Atualização de Digitador
+        if (packet.type === 'typing_status') {
+            if (packet.isTyping) {
+                activeTypers.add(packet.userId);
+            } else {
+                activeTypers.delete(packet.userId);
+            }
+            updateTypingDisplay();
+        }
+
         if (packet.type === 'ban_broadcast') {
             if (!banList.includes(packet.targetId)) banList.push(packet.targetId);
             checkMyBanStatus();
         }
 
-        // Tratar desbanimento transmitido em tempo real
         if (packet.type === 'unban_broadcast') {
             banList = banList.filter(id => id !== packet.targetId);
         }
 
-        // Tratar limpeza de chat em tempo real
         if (packet.type === 'clear_broadcast') {
             chatHistory = [];
             document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico do chat foi limpo pelo moderador.</div>`;
         }
     });
 
-    // --- ENVIAR MENSAGEM / COMANDOS ---
+    // --- LOGICA DE DIGITAÇÃO (DEBOUNCE 3S) ---
+    function handleTyping() {
+        if (!isTyping) {
+            isTyping = true;
+            socket.emit('RemoteEvent', { type: 'typing_status', userId: myId, isTyping: true });
+        }
+        
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            isTyping = false;
+            socket.emit('RemoteEvent', { type: 'typing_status', userId: myId, isTyping: false });
+        }, 3000);
+    }
+
+    function updateTypingDisplay() {
+        const indicator = document.getElementById('typing-indicator');
+        const typersArray = Array.from(activeTypers).filter(id => id !== myId);
+        
+        if (typersArray.length > 0) {
+            indicator.innerText = typersArray.map(id => `ID: ${id.substring(0, 10)} is typing...`).join(', ');
+        } else {
+            indicator.innerText = "";
+        }
+    }
+
+    // --- ENVIO DE IMAGENS ---
+    function triggerImageUpload() {
+        document.getElementById('image-input').click();
+    }
+
+    function handleImageSend(inputEl) {
+        if (inputEl.files.length === 0) return;
+        const file = inputEl.files[0];
+        
+        // Bloqueio de Segurança para Imagens Grandes (Máx 2MB para evitar lag de frames)
+        if (file.size > 2 * 1024 * 1024) {
+            alert("Images are limited to 2MB to keep transmission fluid!");
+            inputEl.value = "";
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const base64Img = e.target.result;
+            
+            socket.emit('RemoteEvent', {
+                type: 'chat_msg',
+                userId: myId,
+                text: "",
+                image: base64Img
+            });
+
+            chatHistory.push({ userId: myId, text: "", image: base64Img });
+            appendMessage(myId, "", true, base64Img);
+
+            if (myId === OWNER_ID) {
+                saveHistoryToDatabase();
+            }
+            inputEl.value = "";
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // --- ENVIAR MENSAGEM ---
     function sendMsg() {
         const input = document.getElementById('chat-input');
         let text = input.value.trim();
         if (!text) return;
 
-        // Se eu for o dono, intercepto comandos locais primeiro
+        // Desliga o status de digitando imediatamente ao enviar
+        isTyping = false;
+        clearTimeout(typingTimeout);
+        socket.emit('RemoteEvent', { type: 'typing_status', userId: myId, isTyping: false });
+
         if (myId === OWNER_ID && text.startsWith('/')) {
             handleOwnerCommand(text);
             input.value = "";
             return;
         }
 
-        // Se eu estiver banido localmente, impede o envio
         if (banList.includes(myId)) {
             checkMyBanStatus();
             return;
         }
 
-        // Envia mensagem convencional de chat
         socket.emit('RemoteEvent', {
             type: 'chat_msg',
             userId: myId,
             text: text
         });
 
-        // Adiciona localmente e salva no histórico do dono se ele estiver ativo
         chatHistory.push({ userId: myId, text: text });
         appendMessage(myId, text, true);
         
@@ -314,57 +422,51 @@
         input.value = "";
     }
 
-    // --- INTERPRETADOR DE COMANDOS DO DONO ---
+    // --- INTERPRETADOR DE COMANDOS ---
     function handleOwnerCommand(cmdStr) {
         const parts = cmdStr.split(' ');
         const cmd = parts[0].toLowerCase();
         const arg = parts[1] ? parts[1].trim() : "";
 
         if (cmd === '/ban' && arg) {
-            // Busca correspondência parcial para banimento rápido
             const resolvedId = resolvePartialUserId(arg);
             if (!resolvedId) {
-                alert("Nenhum usuário correspondente encontrado no histórico.");
+                alert("Nenhum usuário correspondente encontrado.");
                 return;
             }
 
             if (resolvedId === OWNER_ID) {
-                alert("Você não pode banir a si mesmo!");
+                alert("Você não pode se banir!");
                 return;
             }
 
             if (!banList.includes(resolvedId)) {
                 banList.push(resolvedId);
-                // Transmite o banimento para toda a rede
                 socket.emit('RemoteEvent', { type: 'ban_broadcast', targetId: resolvedId });
-                // Salva permanentemente no EBstorage físico do Dono
-                socket.emit('RemoteEvent', { type: 'ebdata_add_blacklist', data: banListToStorageObject() });
+                socket.emit('RemoteEvent', { type: 'ebdata_add_bans', data: banList });
                 addSystemMessage(`Jogador ${resolvedId} foi banido do servidor.`);
             }
-        } 
-        
+        }
+
         else if (cmd === '/unban' && arg) {
             const resolvedId = resolvePartialUserIdFromBans(arg);
             if (resolvedId) {
                 banList = banList.filter(id => id !== resolvedId);
                 socket.emit('RemoteEvent', { type: 'unban_broadcast', targetId: resolvedId });
-                socket.emit('RemoteEvent', { type: 'ebdata_add_blacklist', data: banListToStorageObject() });
+                socket.emit('RemoteEvent', { type: 'ebdata_add_bans', data: banList });
                 addSystemMessage(`Jogador ${resolvedId} foi desbanido.`);
             }
-        } 
-        
-        else if (cmd === '/clear') {
+        }
+        else if (cmd === "/clear") {
             chatHistory = [];
-            socket.emit('RemoteEvent', { type: 'clear_broadcast' });
-            socket.emit('RemoteEvent', { type: 'ebdata_clear' }); // Limpa o banco físico
             document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico do chat foi limpo pelo moderador.</div>`;
+            socket.emit('RemoteEvent', { type: 'clear_broadcast' });
+            socket.emit('RemoteEvent', { type: 'ebdata_clear' }); 
         }
     }
 
-    // --- FUNÇÕES DE AUXÍLIO ---
     function resolvePartialUserId(partial) {
         const clean = partial.toLowerCase();
-        // Varre o histórico em busca de IDs que comecem ou contenham o termo digitado
         for (let msg of chatHistory) {
             if (msg.userId.toLowerCase().includes(clean)) {
                 return msg.userId;
@@ -385,19 +487,10 @@
         if (banList.includes(myId)) {
             document.getElementById('overlay-banned').style.display = 'flex';
             socket.disconnect();
-            isConnected = false;
         }
     }
 
-    function banListToStorageObject() {
-        // Converte a lista de banidos para persistência
-        const obj = {};
-        banList.forEach(id => obj[id] = true);
-        return obj;
-    }
-
     function saveHistoryToDatabase() {
-        // Mantém apenas as últimas 50 mensagens para poupar espaço em disco do servidor
         if (chatHistory.length > 50) chatHistory.shift();
         socket.emit('RemoteEvent', { type: 'ebdata_add_history', data: chatHistory });
     }
@@ -406,18 +499,25 @@
         const container = document.getElementById('chat-messages');
         container.innerHTML = "";
         chatHistory.forEach(msg => {
-            appendMessage(msg.userId, msg.text, msg.userId === myId);
+            appendMessage(msg.userId, msg.text, msg.userId === myId, msg.image);
         });
     }
 
-    function appendMessage(userId, text, isMe) {
+    function appendMessage(userId, text, isMe, imageBase64) {
         const container = document.getElementById('chat-messages');
         const div = document.createElement('div');
         div.className = `msg-bubble ${isMe ? 'me' : 'other'}`;
-        div.innerHTML = `
+        
+        let contentHtml = `
             <div class="sender-id">${userId === OWNER_ID ? 'Moderador / Owner' : 'ID: ' + userId.substring(0, 10)}</div>
-            <div>${text}</div>
+            ${text ? `<div>${text}</div>` : ''}
         `;
+
+        if (imageBase64) {
+            contentHtml += `<img src="${imageBase64}" style="max-width:100%; max-height:220px; border-radius:8px; margin-top:6px; display:block; object-fit:cover;">`;
+        }
+
+        div.innerHTML = contentHtml;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     }
