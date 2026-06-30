@@ -2,761 +2,463 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EAT MY FILES // EMF</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EzBridge | Global Chat Room</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <style>
         :root {
-            --bg: #030712;
-            --panel: #0b0f19;
-            --border: #1f2937;
+            --bg: #09090b;
+            --panel: #18181b;
+            --border: #27272a;
             --accent: #00ff88;
-            --accent-glow: rgba(0, 255, 136, 0.3);
-            --text: #e2e8f0;
-            --text-muted: #8892b0;
-            --error: #ff3366;
+            --accent-dim: rgba(0, 255, 136, 0.15);
+            --blue: #58a6ff;
+            --error: #ff7b72;
+            --text: #f4f4f5;
         }
 
         body, html {
             margin: 0; padding: 0; height: 100%;
             background-color: var(--bg); color: var(--text);
-            font-family: 'Fira Code', monospace, sans-serif;
-            overflow-x: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden; touch-action: none;
         }
 
-        /* Menu de Entrada / Moderação */
-        .screen {
+        /* Telas de Bloqueio / Overlay */
+        .overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.95);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; position: fixed; inset: 0; z-index: 100; background: var(--bg);
+            z-index: 2000; transition: 0.3s;
         }
 
-        .box {
-            background: var(--panel); border: 2px solid var(--border); padding: 40px;
-            border-radius: 16px; text-align: center; width: 350px;
-            box-shadow: 0 10px 40px rgba(0, 255, 136, 0.05);
+        .card {
+            background: var(--panel); border: 1px solid var(--border); padding: 35px;
+            border-radius: 12px; width: 90%; max-width: 450px; text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.8);
         }
 
-        .title {
-            font-size: 2.2rem; font-weight: 900; color: var(--accent);
-            text-shadow: 0 0 15px var(--accent-glow); margin: 0 0 10px 0;
-            letter-spacing: -1px;
+        /* Ban Screen */
+        #ban-screen {
+            background: #1a0508; border: 2px solid var(--error);
+            box-shadow: 0 0 30px rgba(255, 123, 114, 0.2);
         }
 
-        .desc {
-            font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;
-            margin-bottom: 25px; text-align: justify;
+        /* Layout do Chat */
+        .chat-layout {
+            display: flex; flex-direction: column; width: 100vw; height: 100vh;
+            max-width: 600px; border-right: 1px solid var(--border); border-left: 1px solid var(--border);
+            background: var(--panel);
         }
+
+        .chat-header {
+            padding: 15px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: #111113;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: var(--error);
+        }
+        .status-dot.online {
+            background: var(--accent); box-shadow: 0 0 8px var(--accent);
+        }
+
+        .chat-messages {
+            flex-grow: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 15px;
+        }
+
+        .msg-bubble {
+            max-width: 85%; padding: 10px 14px; border-radius: 10px;
+            font-size: 0.95rem; line-height: 1.45; word-wrap: break-word;
+            border: 1px solid var(--border);
+        }
+
+        .msg-bubble.me {
+            align-self: flex-end; background: #1c2e22; border-color: var(--accent-dim);
+            border-bottom-right-radius: 2px;
+        }
+
+        .msg-bubble.other {
+            align-self: flex-start; background: #18181b;
+            border-bottom-left-radius: 2px;
+        }
+
+        .msg-bubble .sender-id {
+            font-size: 0.7rem; font-family: monospace; font-weight: bold;
+            color: var(--blue); margin-bottom: 4px;
+        }
+
+        .msg-bubble.me .sender-id { color: var(--accent); }
+
+        .system-msg {
+            text-align: center; font-size: 0.8rem; color: #71717a;
+            margin: 10px 0; font-family: monospace;
+        }
+
+        .input-bar {
+            padding: 15px; border-top: 1px solid var(--border);
+            background: #111113; display: flex; gap: 10px;
+        }
+
+        input {
+            flex-grow: 1; background: #09090b; border: 1px solid var(--border);
+            color: white; padding: 12px; border-radius: 8px; outline: none;
+            font-size: 0.95rem; font-family: monospace;
+        }
+        input:focus { border-color: var(--blue); }
 
         .btn {
-            width: 100%; padding: 14px; margin: 10px 0; background: var(--accent);
-            border: none; color: black; font-weight: bold; border-radius: 8px;
-            cursor: pointer; transition: 0.2s; font-size: 0.95rem; font-family: inherit;
+            background: var(--accent); color: black; border: none; padding: 0 20px;
+            border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;
         }
-        .btn:hover { background: #00cc6a; box-shadow: 0 0 15px var(--accent-glow); }
-        .btn:disabled { background: #1f2937; color: #4b5563; cursor: not-allowed; box-shadow: none; }
-        .btn-secondary { background: #111827; color: #fff; border: 1px solid var(--border); }
-        .btn-secondary:hover { background: #1f2937; }
-
-        /* Container Principal do App */
-        .app-container {
-            display: none; grid-template-columns: 320px 1fr; height: 100vh;
-        }
-
-        /* Painel Lateral */
-        .sidebar {
-            background: var(--panel); border-right: 1px solid var(--border);
-            display: flex; flex-direction: column; padding: 20px;
-        }
-
-        .status-card {
-            background: #090d16; border: 1px solid var(--border);
-            padding: 15px; border-radius: 8px; margin-bottom: 15px;
-        }
-        .status-title { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
-        .status-value { font-size: 0.95rem; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; }
-        .status-dot.online { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-        .status-dot.inactive { background: #eab308; box-shadow: 0 0 8px #eab308; }
-        .status-dot.uploading { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
-
-        /* Área de Listagem de Arquivos */
-        .main-panel {
-            display: flex; flex-direction: column; padding: 25px; overflow-y: auto;
-        }
-
-        .file-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex-grow: 1;
-        }
-
-        .file-section {
-            background: var(--panel); border: 1px solid var(--border);
-            border-radius: 12px; padding: 20px; display: flex; flex-direction: column;
-            max-height: 70vh;
-        }
-
-        .section-title {
-            font-size: 1rem; color: var(--accent); border-bottom: 1px solid var(--border);
-            padding-bottom: 10px; margin-top: 0; margin-bottom: 15px;
-        }
-
-        .file-list {
-            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
-        }
-
-        .file-item {
-            background: #090d16; border: 1px solid var(--border);
-            padding: 10px 15px; border-radius: 6px; display: flex;
-            justify-content: space-between; align-items: center; font-size: 0.85rem;
-        }
-
-        .file-info { display: flex; flex-direction: column; gap: 3px; max-width: 80%; }
-        .file-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .file-size { font-size: 0.75rem; color: var(--text-muted); }
-
-        .btn-remove {
-            background: transparent; border: none; color: var(--error);
-            font-size: 1.1rem; cursor: pointer; padding: 0 5px;
-        }
-
-        /* Popups / Modais */
-        .popup-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-            display: none; align-items: center; justify-content: center; z-index: 500;
-        }
-
-        .popup-content {
-            background: var(--panel); border: 2px solid var(--border);
-            padding: 30px; border-radius: 12px; width: 320px; text-align: center;
-        }
-
-        /* Barra de Progresso */
-        .progress-container {
-            width: 100%; background: #090d16; border-radius: 10px;
-            height: 10px; margin: 15px 0; overflow: hidden; border: 1px solid var(--border);
-        }
-        .progress-bar {
-            height: 100%; width: 0%; background: var(--accent); transition: 0.1s;
-        }
+        .btn:hover { background: #00cc6a; }
     </style>
 </head>
 <body>
 
-    <!-- Passo 1: Landing Page com reCAPTCHA -->
-    <div id="screen-landing" class="screen">
-        <div class="box" style="width: 420px;">
-            <div class="title">EAT MY FILES</div>
-            <div class="desc">
-                Welcome to EMF. Here, you are able to upload files, folders, share and receive from friends or anyone else. 
-                This app is completely free, with no space limits or wait times!<br><br>
-                <span style="color: var(--error); font-weight: bold;">WARNING:</span> Do not dare test my server, or the consequences will not be good.
-            </div>
-            
-            <!-- Widget reCAPTCHA -->
-            <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-                <div class="g-recaptcha" data-sitekey="6Lf8VTMtAAAAAAMXrs6lk-tLBjuW0u8ZV5LevzMz" data-callback="onCaptchaSuccess"></div>
-            </div>
-
-            <button id="btn-captcha-verify" class="btn" disabled onclick="verifyCaptcha()">ENTER APP</button>
+    <!-- Passo 0: Buffering Inicial -->
+    <div id="overlay-sync" class="overlay">
+        <div class="card" style="border-color: var(--border);">
+            <h3 style="margin-bottom: 20px; color: var(--blue);">Synchronizing Secure Connection...</h3>
+            <div style="font-size:0.8rem; color:#71717a; font-family: monospace;">Syncing unique UserID with EzBridge.</div>
         </div>
     </div>
 
-    <!-- Passo 2: Seleção de Servidor -->
-    <div id="screen-setup" class="screen" style="display:none;">
-        <div class="box">
-            <h2 style="margin-top:0; color: var(--accent);">CHOOSE PATH</h2>
-            <button class="btn" onclick="createServer()">Create Server</button>
-            <div style="margin: 15px 0; color: var(--text-muted); font-size: 0.8rem;">OR</div>
-            <input type="text" id="join-code-input" placeholder="8-CHAR CODE" maxlength="8">
-            <button class="btn btn-secondary" onclick="joinServer()">Join Server</button>
+    <!-- Tela de Banimento Físico -->
+    <div id="overlay-banned" class="overlay" style="display:none;">
+        <div class="card" id="ban-screen">
+            <h1 style="color: var(--error); text-shadow: 0 0 10px rgba(255, 123, 114, 0.4);">⚠️ YOUR SESSION HAS BEEN BANNED</h1>
+            <p style="font-family: monospace; font-size: 0.85rem; color: #a1a1aa; line-height: 1.5; margin: 20px 0;">
+                R: Ban enforcement.<br>
+                You are permanently disconnected from this global chat room.
+            </p>
         </div>
     </div>
 
-    <!-- Passo 2.5: Lobby de Espera (Apenas Host Vê) -->
-    <div id="screen-lobby" class="screen" style="display:none;">
-        <div class="box">
-            <h3 style="margin-top:0; color: var(--accent);">Lobby Created</h3>
-            <p style="font-size:0.8rem; color:var(--text-muted);">Click the code to copy:</p>
-            <div id="lobby-code-display" style="font-size:1.8rem; font-weight:bold; letter-spacing:2px; cursor:pointer; color:var(--accent); margin: 15px 0;" onclick="copyLobbyCode()">--------</div>
-            <button class="btn btn-secondary" onclick="leaveLobby()">Leave Server</button>
-        </div>
-    </div>
-
-    <!-- Interface Principal de Compartilhamento -->
-    <div id="app" class="app-container">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="title" style="font-size: 1.5rem;">EMF SHARE</div>
-            <hr style="border-color: var(--border); margin: 15px 0; width: 100%;">
-            
-            <!-- Status Card: Você -->
-            <div class="status-card">
-                <div class="status-title">You</div>
-                <div class="status-value">
-                    <div id="my-status-dot" class="status-dot online"></div>
-                    <span id="my-status-text">ONLINE</span>
-                </div>
-                <div style="font-size:0.8rem; color:var(--text-muted);" id="my-stats-summary">0 files (0 KB)</div>
+    <!-- Layout do Chat Room -->
+    <div class="chat-layout">
+        <div class="chat-header">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div id="status-dot" class="status-dot"></div>
+                <span style="font-weight: bold; font-size: 0.95rem;" id="my-id-display">Connecting...</span>
             </div>
-
-            <!-- Status Card: Conectado -->
-            <div class="status-card">
-                <div class="status-title">Guest</div>
-                <div class="status-value">
-                    <div id="guest-status-dot" class="status-dot"></div>
-                    <span id="guest-status-text">OFFLINE</span>
-                </div>
-                <div style="font-size:0.8rem; color:var(--text-muted);" id="guest-stats-summary">0 files (0 KB)</div>
-            </div>
-
-            <button class="btn btn-secondary" style="margin-top: auto;" onclick="leaveLobby()">Leave</button>
+            <button class="btn" style="padding:6px 12px; font-size:0.75rem;" onclick="copyMyId()">Copy ID</button>
         </div>
 
-        <!-- Painel de Arquivos -->
-        <div class="main-panel">
-            <div style="display: flex; gap: 15px; margin-bottom: 25px;">
-                <!-- Inputs Ocultos de Arquivo e Pasta -->
-                <input type="file" id="file-uploader" multiple style="display:none;" onchange="handleFileSelection(event)">
-                <input type="file" id="folder-uploader" webkitdirectory directory multiple style="display:none;" onchange="handleFileSelection(event)">
-                
-                <button class="btn" style="width: auto; flex:1;" id="upload-files-btn" onclick="triggerFileUpload(false)">Upload Files</button>
-                <button class="btn btn-secondary" style="width: auto; flex:1;" id="upload-folder-btn" onclick="triggerFileUpload(true)">Upload Folder</button>
-                <button class="btn" style="width: auto; flex: 1.2; background: #0070f3;" id="send-files-btn" onclick="initiateFileTransfer()">Send Files</button>
-            </div>
-
-            <div class="file-grid">
-                <!-- Seus Arquivos -->
-                <div class="file-section">
-                    <h3 class="section-title">Your Files</h3>
-                    <div class="file-list" id="my-file-list"></div>
-                </div>
-
-                <!-- Arquivos do Conectado -->
-                <div class="file-section">
-                    <h3 class="section-title">Guest's Files</h3>
-                    <div class="file-list" id="guest-file-list"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modais / Popups -->
-    <div id="popup-overlay" class="popup-overlay">
-        <!-- Loader / Espera de Aceite -->
-        <div id="popup-waiting" class="popup-content" style="display:none;">
-            <h4 style="margin-top:0; color:var(--accent);">Buffering</h4>
-            <p id="waiting-msg">Waiting for Guest to accept...</p>
+        <div id="chat-messages" class="chat-messages">
+            <div class="system-msg">[System] Conectado ao chat global. Carregando histórico...</div>
         </div>
 
-        <!-- Confirmação de Recebimento -->
-        <div id="popup-incoming" class="popup-content" style="display:none;">
-            <h4 style="margin-top:0; color:var(--accent);">Incoming Transfer</h4>
-            <p id="incoming-msg">Your Guest wants to send you 0 files, and the download size will be 0 KB. Will you accept?</p>
-            <div style="display:flex; gap:10px; margin-top:20px;">
-                <button class="btn" onclick="respondToTransfer(true)" style="margin:0;">YES</button>
-                <button class="btn btn-secondary" onclick="respondToTransfer(false)" style="margin:0;">NO</button>
-            </div>
-            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:10px;" id="incoming-timer">(15s remaining)</div>
-        </div>
-
-        <!-- Progresso de Download / Compressão -->
-        <div id="popup-progress" class="popup-content" style="display:none;">
-            <h4 id="progress-title" style="margin-top:0; color:var(--accent);">Transferring...</h4>
-            <div class="progress-container">
-                <div class="progress-bar" id="transfer-progress"></div>
-            </div>
-            <p id="progress-status" style="font-size:0.8rem; color:var(--text-muted);">0% complete</p>
+        <div class="input-bar">
+            <input type="text" id="chat-input" placeholder="Type a message or command..." autocomplete="off">
+            <button class="btn" onclick="sendMsg()">Send</button>
         </div>
     </div>
 
 <script>
-    // --- CONFIGURAÇÃO SERVIDOR ---
-    const TUNNEL = "https://sheer-controls-clothing-resident.trycloudflare.com"; 
-    const AUTH_KEY = "Gow3w3WzY";
-    const socket = io(TUNNEL, { auth: { token: AUTH_KEY }, transports: ['websocket'] });
+    // --- CREDENCIAIS ---
+    const TUNNEL = "https://card-green-operational-dev.trycloudflare.com";
+    const VIRTUAL_SERVER_KEY = "13c25d9dae";
+    const OWNER_ID = "da0d3ac30047021752d9";
 
-    let myRoom = "";
-    let isHost = false;
-    let verified = false;
-    let localFiles = [];      
-    let remoteFilesSummary = []; 
-    let currentStatus = "ONLINE";
+    let myId = getCookie("eb_owner_id") || "";
+    let socket = io(TUNNEL, { auth: { token: "default_key" }, transports: ['websocket'] });
 
-    // Controle de limite de requisições de cliente (Máximo de 14 por segundo)
-    let clientRequestsThisSecond = 0;
-    setInterval(() => { clientRequestsThisSecond = 0; }, 1000);
+    let banList = [];
+    let chatHistory = [];
+    let isConnected = false;
+    let ProcessandoIA = false; // Evitar loops de renderização
 
-    function canSendRequest() {
-        if (clientRequestsThisSecond >= 14) {
-            console.warn("[EMF Security] Rate Limit Client-Side triggered.");
-            return false;
-        }
-        clientRequestsThisSecond++;
-        return true;
-    }
-
-    // --- RECAPTCHA LOGIC ---
-    function onCaptchaSuccess() {
-        document.getElementById('btn-captcha-verify').removeAttribute('disabled');
-    }
-
-    function verifyCaptcha() {
-        // No client-side, o token resolvido do widget é suficiente para o fluxo de simulação
-        const response = grecaptcha.getResponse();
-        if (response.length > 0) {
-            document.getElementById('screen-landing').style.display = 'none';
-            document.getElementById('screen-setup').style.display = 'flex';
-        }
-    }
-
-    // --- SOCKET LOGIC ---
+    // --- CONEXÃO E IDENTIFICAÇÃO ---
     socket.on('connect', () => {
-        console.log("[EMF] Handshake complete.");
+        socket.emit('eb_sync_session', { ownerId: myId });
     });
 
-    socket.on('RemoteEvent', (packet) => {
-        const d = packet;
-        if (!d) return;
-
-        // Gerenciamento de lobbies e controle de ocupação de sala (Máximo 2 pessoas)
-        if (d.type === 'emf_lobby_join') {
-            if (isHost && myRoom === d.room) {
-                // Host aceita a conexão e avisa que a sala está cheia
-                socket.emit('RemoteEvent', { type: 'emf_lobby_full', room: myRoom });
-                transitionToGame();
-            }
-        }
-
-        if (d.type === 'emf_lobby_full' && d.room === myRoom && !isHost) {
-            transitionToGame();
-        }
-
-        // Sincronização de status das máquinas
-        if (d.type === 'emf_status_sync' && d.room === myRoom) {
-            updateGuestStatus(d.status, d.size, d.count);
-        }
-
-        // Sincronização de listas de arquivos selecionados
-        if (d.type === 'emf_file_list_sync' && d.room === myRoom) {
-            remoteFilesSummary = d.files;
-            renderRemoteFiles();
-        }
-
-        // Fluxo de Transferência (Pedido)
-        if (d.type === 'emf_transfer_request' && d.room === myRoom) {
-            showIncomingRequest(d.count, d.size);
-        }
-
-        // Resposta do receptor
-        if (d.type === 'emf_transfer_response' && d.room === myRoom) {
-            handleTransferResponse(d.accept);
-        }
-
-        // Recepção dos pedaços binários (chunking)
-        if (d.type === 'emf_chunk' && d.room === myRoom) {
-            receiveChunk(d);
-        }
-
-        // Sincronizar saída
-        if (d.type === 'emf_leave' && d.room === myRoom) {
-            alert("Guest left the room.");
-            location.reload();
-        }
-    });
-
-    // --- MONITORAÇÃO DE FOCO (ONLINE / INACTIVE) ---
-    window.addEventListener('focus', () => {
-        if (gameActive()) {
-            sendStatusUpdate("ONLINE");
-        }
-    });
-
-    window.addEventListener('blur', () => {
-        if (gameActive()) {
-            sendStatusUpdate("INACTIVE");
-        }
-    });
-
-    function gameActive() {
-        return document.getElementById('app').style.display === 'grid';
-    }
-
-    // --- ROOM CREATION / JOIN ---
-    function createServer() {
-        if (!canSendRequest()) return;
-        isHost = true;
-        myRoom = Math.random().toString(36).substring(2, 10).toUpperCase(); // 8 Chars
+    socket.on('session_verified', (data) => {
+        myId = data.ownerId;
+        setCookie("eb_owner_id", myId, 365);
         
-        document.getElementById('screen-setup').style.display = 'none';
-        document.getElementById('screen-lobby').style.display = 'flex';
-        document.getElementById('lobby-code-display').innerText = myRoom;
+        document.getElementById('my-id-display').innerText = `ID: ${myId.substring(0, 10)}`;
+        document.getElementById('status-dot').classList.add('online');
+        document.getElementById('overlay-sync').style.display = 'none';
 
-        socket.emit('RemoteEvent', { type: 'emf_lobby_create', room: myRoom });
-    }
+        // Entrar na sala do Servidor Virtual
+        socket.emit('join_virtual_server', { key: VIRTUAL_SERVER_KEY });
+    });
 
-    function copyLobbyCode() {
-        navigator.clipboard.writeText(myRoom);
-        alert("Room Code copied: " + myRoom);
-    }
+    socket.on('joined_successfully', () => {
+        isConnected = true;
+        
+        // Se eu for o dono, carrego o histórico e a lista de banimentos direto do meu EBstorage persistente
+        if (myId === OWNER_ID) {
+            socket.emit('RemoteEvent', { type: 'ebdata_fetch_global_bans' });
+            socket.emit('RemoteEvent', { type: 'ebdata_fetch_global_history' });
+        } else {
+            // Se eu for espectador, peço os dados de histórico para quem estiver online na sala
+            socket.emit('RemoteEvent', { type: 'sync_request', senderId: myId });
+        }
+    });
 
-    function joinServer() {
-        if (!canSendRequest()) return;
-        const code = document.getElementById('join-code-input').value.trim().toUpperCase();
-        if (code.length !== 8) return alert("Code must be 8 characters.");
-
-        isHost = false;
-        myRoom = code;
-
-        // Informa a sala que deseja conectar
-        socket.emit('RemoteEvent', { type: 'emf_lobby_join', room: myRoom });
-    }
-
-    function leaveLobby() {
-        if (!canSendRequest()) return;
-        socket.emit('RemoteEvent', { type: 'emf_leave', room: myRoom });
+    socket.on('join_error', (data) => {
+        alert("Erro de conexão: " + data.error);
         location.reload();
-    }
+    });
 
-    function transitionToGame() {
-        document.getElementById('screen-lobby').style.display = 'none';
-        document.getElementById('screen-setup').style.display = 'none';
-        document.getElementById('app').style.display = 'grid';
-        sendStatusUpdate("ONLINE");
-    }
+    socket.on('connect_error', () => {
+        document.getElementById('status-dot').classList.remove('online');
+        document.getElementById('my-id-display').innerText = "Offline";
+    });
 
-    // --- STATUS UPDATES ---
-    function sendStatusUpdate(status) {
-        if (!canSendRequest()) return;
-        currentStatus = status;
-        const totalSize = getMyFilesSize();
-        
-        // Sincroniza dados com o outro usuário
-        socket.emit('RemoteEvent', {
-            type: 'emf_status_sync',
-            room: myRoom,
-            status: status,
-            size: totalSize,
-            count: localFiles.length
-        });
+    // --- RECEBIMENTO DE EVENTOS E BANCO ---
+    socket.on('RemoteEvent', (packet) => {
+        if (!isConnected) return;
 
-        // Atualiza a minha própria interface
-        document.getElementById('my-status-dot').className = `status-dot ${status.toLowerCase()}`;
-        document.getElementById('my-status-text').innerText = status;
-        document.getElementById('my-stats-summary').innerText = `${localFiles.length} files (${formatBytes(totalSize)})`;
-    }
-
-    function updateGuestStatus(status, size, count) {
-        const dot = document.getElementById('guest-status-dot');
-        dot.className = `status-dot ${status.toLowerCase()}`;
-        document.getElementById('guest-status-text').innerText = status;
-        document.getElementById('guest-stats-summary').innerText = `${count} files (${formatBytes(size)})`;
-    }
-
-    // --- MANIPULAÇÃO DE ARQUIVOS (YOUR FILES) ---
-    function triggerFileUpload(isFolder) {
-        sendStatusUpdate("UPLOADING"); // Status dinâmico ao abrir o explorer
-        if (isFolder) {
-            document.getElementById('folder-uploader').click();
-        } else {
-            document.getElementById('file-uploader').click();
-        }
-    }
-
-    function handleFileSelection(event) {
-        const selected = event.target.files;
-        for (let file of selected) {
-            localFiles.push(file);
-        }
-        sendStatusUpdate("ONLINE");
-        syncFilesList();
-    }
-
-    function removeFile(index) {
-        localFiles.splice(index, 1);
-        syncFilesList();
-    }
-
-    function syncFilesList() {
-        if (!canSendRequest()) return;
-        
-        // Envia lista simplificada (apenas nomes e tamanhos) para o outro ver
-        const summary = localFiles.map(f => ({ name: f.name, size: f.size }));
-        socket.emit('RemoteEvent', {
-            type: 'emf_file_list_sync',
-            room: myRoom,
-            files: summary
-        });
-
-        renderMyFiles();
-        sendStatusUpdate("ONLINE"); // Recalcula tamanhos e status
-    }
-
-    function renderMyFiles() {
-        const list = document.getElementById('my-file-list');
-        list.innerHTML = "";
-        localFiles.forEach((file, index) => {
-            const item = document.createElement('div');
-            item.className = "file-item";
-            item.innerHTML = `
-                <div class="file-info">
-                    <div class="file-name" title="${file.name}">${file.name}</div>
-                    <div class="file-size">${formatBytes(file.size)}</div>
-                </div>
-                <button class="btn-remove" onclick="removeFile(${index})">✕</button>
-            `;
-            list.appendChild(item);
-        });
-    }
-
-    function renderRemoteFiles() {
-        const list = document.getElementById('guest-file-list');
-        list.innerHTML = "";
-        remoteFilesSummary.forEach((file) => {
-            const item = document.createElement('div');
-            item.className = "file-item";
-            item.innerHTML = `
-                <div class="file-info">
-                    <div class="file-name" title="${file.name}">${file.name}</div>
-                    <div class="file-size">${formatBytes(file.size)}</div>
-                </div>
-            `;
-            list.appendChild(item);
-        });
-    }
-
-    // --- SISTEMA DE TRANSFERÊNCIA CHUNKED (P2P SOBRE SOCKET) ---
-    let incomingAcceptTimeout;
-    let chunkQueue = [];
-    let receivedChunks = {};
-    let activeIncomingFiles = [];
-
-    function initiateFileTransfer() {
-        if (localFiles.length === 0) return alert("Selecione os arquivos primeiro.");
-        if (!canSendRequest()) return;
-
-        // Abre pop-up de espera do remetente
-        document.getElementById('popup-overlay').style.display = 'flex';
-        document.getElementById('popup-waiting').style.display = 'block';
-
-        socket.emit('RemoteEvent', {
-            type: 'emf_transfer_request',
-            room: myRoom,
-            count: localFiles.length,
-            size: getMyFilesSize()
-        });
-    }
-
-    function showIncomingRequest(count, size) {
-        document.getElementById('popup-overlay').style.display = 'flex';
-        document.getElementById('popup-incoming').style.display = 'block';
-        document.getElementById('incoming-msg').innerText = `Your Guest wants to send you ${count} files, and the download size will be ${formatBytes(size)}. Will you accept?`;
-
-        let timeLeft = 15;
-        document.getElementById('incoming-timer').innerText = `(${timeLeft}s remaining)`;
-        
-        clearInterval(incomingAcceptTimeout);
-        incomingAcceptTimeout = setInterval(() => {
-            timeLeft--;
-            document.getElementById('incoming-timer').innerText = `(${timeLeft}s remaining)`;
-            if (timeLeft <= 0) {
-                clearInterval(incomingAcceptTimeout);
-                respondToTransfer(false); // Recusa automática no timeout
+        // Tratar recebimento das respostas do banco de dados (EBstorage) do Dono
+        if (packet.type === 'storage_response') {
+            const res = packet.result;
+            if (res && res.success === undefined) {
+                // É um retorno de fetch
+                if (res.data) {
+                    if (packet.cmd_type === 'ebdata_fetch_global_bans') {
+                        banList = res.data;
+                        checkMyBanStatus();
+                    }
+                    if (packet.cmd_type === 'ebdata_fetch_global_history') {
+                        chatHistory = res.data;
+                        renderChatHistory();
+                    }
+                }
             }
-        }, 1000);
-    }
-
-    function respondToTransfer(accepted) {
-        clearInterval(incomingAcceptTimeout);
-        document.getElementById('popup-incoming').style.display = 'none';
-
-        if (accepted) {
-            // Se aceitou, abre popup de progresso
-            document.getElementById('popup-progress').style.display = 'block';
-            document.getElementById('progress-title').innerText = "Downloading...";
-            document.getElementById('transfer-progress').style.backgroundColor = 'var(--accent)';
-            document.getElementById('transfer-progress').style.width = '0%';
-            
-            // Avisa o host
-            socket.emit('RemoteEvent', { type: 'emf_transfer_response', room: myRoom, accept: true });
-        } else {
-            document.getElementById('popup-overlay').style.display = 'none';
-            socket.emit('RemoteEvent', { type: 'emf_transfer_response', room: myRoom, accept: false });
-        }
-    }
-
-    function handleTransferResponse(accepted) {
-        document.getElementById('popup-waiting').style.display = 'none';
-
-        if (accepted) {
-            // Bloqueia nova seleção ou novos envios do remetente durante a transferência
-            toggleInputs(false);
-            
-            document.getElementById('popup-progress').style.display = 'block';
-            document.getElementById('progress-title').innerText = "Compressing & Sending...";
-            document.getElementById('transfer-progress').style.backgroundColor = 'var(--accent)';
-            document.getElementById('transfer-progress').style.width = '0%';
-
-            startChunkedUpload();
-        } else {
-            document.getElementById('popup-overlay').style.display = 'none';
-            alert("Guest has denied your request.");
-        }
-    }
-
-    // Divide os arquivos em partes binárias de 64KB e transfere respeitando o limite
-    async function startChunkedUpload() {
-        const zip = new JSZip();
-        
-        // Compacta todos os arquivos selecionados localmente em um arquivo ZIP
-        for (let file of localFiles) {
-            zip.file(file.name, file);
         }
 
-        try {
-            const blob = await zip.generateAsync({ type: 'blob' }, (metadata) => {
-                document.getElementById('progress-status').innerText = `Zipping: ${Math.floor(metadata.percent)}%`;
-            });
-
-            document.getElementById('progress-title').innerText = "Uploading...";
-            
-            // Fatiamento do ZIP gerado
-            const chunkSize = 64 * 1024; // 64 KB por pedaço
-            const totalChunks = Math.ceil(blob.size / chunkSize);
-            let offset = 0;
-
-            chunkQueue = [];
-            for (let i = 0; i < totalChunks; i++) {
-                const chunk = blob.slice(offset, offset + chunkSize);
-                offset += chunkSize;
-                chunkQueue.push({ index: i, total: totalChunks, blobChunk: chunk });
+        // P2P: Sincronização de novos usuários que entraram
+        if (packet.type === 'sync_request') {
+            // Se eu tenho dados (Dono ou participante ativo), respondo enviando o histórico
+            if (chatHistory.length > 0 || banList.length > 0) {
+                socket.emit('RemoteEvent', {
+                    type: 'sync_response',
+                    targetId: packet.senderId,
+                    banList: banList,
+                    chatHistory: chatHistory
+                });
             }
-
-            // Envia de forma sequenciada a no máximo 10 requisições por segundo (Seguro contra Rate Limits)
-            sendNextChunk();
-
-        } catch (e) {
-            handleTransferError();
         }
-    }
 
-    function sendNextChunk() {
-        if (chunkQueue.length === 0) {
-            // Finalizado com sucesso
-            setTimeout(() => {
-                document.getElementById('popup-overlay').style.display = 'none';
-                document.getElementById('popup-progress').style.display = 'none';
-                toggleInputs(true);
-                alert("Files sent successfully!");
-            }, 1000);
+        if (packet.type === 'sync_response' && packet.targetId === myId) {
+            banList = packet.banList || [];
+            chatHistory = packet.chatHistory || [];
+            checkMyBanStatus();
+            renderChatHistory();
+        }
+
+        // Tratar novas mensagens enviadas em tempo real
+        if (packet.type === 'chat_msg') {
+            chatHistory.push({ userId: packet.userId, text: packet.text });
+            appendMessage(packet.userId, packet.text, packet.userId === myId);
+        }
+
+        // Tratar banimento transmitido em tempo real
+        if (packet.type === 'ban_broadcast') {
+            if (!banList.includes(packet.targetId)) banList.push(packet.targetId);
+            checkMyBanStatus();
+        }
+
+        // Tratar desbanimento transmitido em tempo real
+        if (packet.type === 'unban_broadcast') {
+            banList = banList.filter(id => id !== packet.targetId);
+        }
+
+        // Tratar limpeza de chat em tempo real
+        if (packet.type === 'clear_broadcast') {
+            chatHistory = [];
+            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico do chat foi limpo pelo moderador.</div>`;
+        }
+    });
+
+    // --- ENVIAR MENSAGEM / COMANDOS ---
+    function sendMsg() {
+        const input = document.getElementById('chat-input');
+        let text = input.value.trim();
+        if (!text) return;
+
+        // Se eu for o dono, intercepto comandos locais primeiro
+        if (myId === OWNER_ID && text.startsWith('/')) {
+            handleOwnerCommand(text);
+            input.value = "";
             return;
         }
 
-        const task = chunkQueue.shift();
-        const reader = new FileReader();
+        // Se eu estiver banido localmente, impede o envio
+        if (banList.includes(myId)) {
+            checkMyBanStatus();
+            return;
+        }
+
+        // Envia mensagem convencional de chat
+        socket.emit('RemoteEvent', {
+            type: 'chat_msg',
+            userId: myId,
+            text: text
+        });
+
+        // Adiciona localmente e salva no histórico do dono se ele estiver ativo
+        chatHistory.push({ userId: myId, text: text });
+        appendMessage(myId, text, true);
         
-        reader.onload = function(e) {
-            const base64Data = e.target.result.split(',')[1];
-            
-            // Envia o chunk via Socket
-            socket.emit('RemoteEvent', {
-                type: 'emf_chunk',
-                room: myRoom,
-                index: task.index,
-                total: task.total,
-                data: base64Data
-            });
+        if (myId === OWNER_ID) {
+            saveHistoryToDatabase();
+        }
 
-            const percent = Math.floor((task.index / task.total) * 100);
-            document.getElementById('transfer-progress').style.width = `${percent}%`;
-            document.getElementById('progress-status').innerText = `Uploading: ${percent}%`;
-
-            // Mantém um intervalo de 80ms entre envios (~12 req/segundo) para evitar kick de flood do servidor
-            setTimeout(sendNextChunk, 80);
-        };
-
-        reader.readAsDataURL(task.blobChunk);
+        input.value = "";
     }
 
-    function receiveChunk(d) {
-        if (!receivedChunks[myRoom]) receivedChunks[myRoom] = [];
+    // --- INTERPRETADOR DE COMANDOS DO DONO ---
+    function handleOwnerCommand(cmdStr) {
+        const parts = cmdStr.split(' ');
+        const cmd = parts[0].toLowerCase();
+        const arg = parts[1] ? parts[1].trim() : "";
+
+        if (cmd === '/ban' && arg) {
+            // Busca correspondência parcial para banimento rápido
+            const resolvedId = resolvePartialUserId(arg);
+            if (!resolvedId) {
+                alert("Nenhum usuário correspondente encontrado no histórico.");
+                return;
+            }
+
+            if (resolvedId === OWNER_ID) {
+                alert("Você não pode banir a si mesmo!");
+                return;
+            }
+
+            if (!banList.includes(resolvedId)) {
+                banList.push(resolvedId);
+                // Transmite o banimento para toda a rede
+                socket.emit('RemoteEvent', { type: 'ban_broadcast', targetId: resolvedId });
+                // Salva permanentemente no EBstorage físico do Dono
+                socket.emit('RemoteEvent', { type: 'ebdata_add_blacklist', data: banListToStorageObject() });
+                addSystemMessage(`Jogador ${resolvedId} foi banido do servidor.`);
+            }
+        } 
         
-        receivedChunks[myRoom][d.index] = d.data;
+        else if (cmd === '/unban' && arg) {
+            const resolvedId = resolvePartialUserIdFromBans(arg);
+            if (resolvedId) {
+                banList = banList.filter(id => id !== resolvedId);
+                socket.emit('RemoteEvent', { type: 'unban_broadcast', targetId: resolvedId });
+                socket.emit('RemoteEvent', { type: 'ebdata_add_blacklist', data: banListToStorageObject() });
+                addSystemMessage(`Jogador ${resolvedId} foi desbanido.`);
+            }
+        } 
         
-        const percent = Math.floor((Object.keys(receivedChunks[myRoom]).length / d.total) * 100);
-        document.getElementById('transfer-progress').style.width = `${percent}%`;
-        document.getElementById('progress-status').innerText = `Downloading: ${percent}%`;
+        else if (cmd === '/clear') {
+            chatHistory = [];
+            socket.emit('RemoteEvent', { type: 'clear_broadcast' });
+            socket.emit('RemoteEvent', { type: 'ebdata_clear' }); // Limpa o banco físico
+            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico do chat foi limpo pelo moderador.</div>`;
+        }
+    }
 
-        if (Object.keys(receivedChunks[myRoom]).length === d.total) {
-            // Remonta o ZIP
-            try {
-                const base64Parts = receivedChunks[myRoom];
-                const byteCharacters = atob(base64Parts.join(''));
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const zipBlob = new Blob([byteArray], { type: 'application/zip' });
-
-                // Dispara download automático do ZIP
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(zipBlob);
-                link.download = "EMFsharedfiles.zip";
-                link.click();
-
-                setTimeout(() => {
-                    document.getElementById('popup-overlay').style.display = 'none';
-                    document.getElementById('popup-progress').style.display = 'none';
-                    receivedChunks[myRoom] = [];
-                    alert("Download complete!");
-                }, 1000);
-
-            } catch (e) {
-                handleTransferError();
+    // --- FUNÇÕES DE AUXÍLIO ---
+    function resolvePartialUserId(partial) {
+        const clean = partial.toLowerCase();
+        // Varre o histórico em busca de IDs que comecem ou contenham o termo digitado
+        for (let msg of chatHistory) {
+            if (msg.userId.toLowerCase().includes(clean)) {
+                return msg.userId;
             }
         }
+        return partial.length >= 10 ? partial : null;
     }
 
-    function handleTransferError() {
-        document.getElementById('transfer-progress').style.backgroundColor = 'var(--error)';
-        document.getElementById('progress-title').innerText = "Transfer Failed!";
-        document.getElementById('progress-status').innerText = "⚠️ Network error or connection closed.";
-        setTimeout(() => {
-            document.getElementById('popup-overlay').style.display = 'none';
-            document.getElementById('popup-progress').style.display = 'none';
-            toggleInputs(true);
-        }, 4000);
+    function resolvePartialUserIdFromBans(partial) {
+        const clean = partial.toLowerCase();
+        for (let id of banList) {
+            if (id.toLowerCase().includes(clean)) return id;
+        }
+        return partial;
     }
 
-    function toggleInputs(enabled) {
-        const el1 = document.getElementById('upload-files-btn');
-        const el2 = document.getElementById('upload-folder-btn');
-        const el3 = document.getElementById('send-files-btn');
-        if (enabled) {
-            el1.removeAttribute('disabled');
-            el2.removeAttribute('disabled');
-            el3.removeAttribute('disabled');
-        } else {
-            el1.setAttribute('disabled', 'true');
-            el2.setAttribute('disabled', 'true');
-            el3.setAttribute('disabled', 'true');
+    function checkMyBanStatus() {
+        if (banList.includes(myId)) {
+            document.getElementById('overlay-banned').style.display = 'flex';
+            socket.disconnect();
+            isConnected = false;
         }
     }
 
-    // --- HELPERS ---
-    function getMyFilesSize() {
-        return localFiles.reduce((acc, f) => acc + f.size, 0);
+    function banListToStorageObject() {
+        // Converte a lista de banidos para persistência
+        const obj = {};
+        banList.forEach(id => obj[id] = true);
+        return obj;
     }
 
-    function formatBytes(bytes, decimals = 2) {
-        if (!+bytes) return '0 Bytes';
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    function saveHistoryToDatabase() {
+        // Mantém apenas as últimas 50 mensagens para poupar espaço em disco do servidor
+        if (chatHistory.length > 50) chatHistory.shift();
+        socket.emit('RemoteEvent', { type: 'ebdata_add_history', data: chatHistory });
     }
+
+    function renderChatHistory() {
+        const container = document.getElementById('chat-messages');
+        container.innerHTML = "";
+        chatHistory.forEach(msg => {
+            appendMessage(msg.userId, msg.text, msg.userId === myId);
+        });
+    }
+
+    function appendMessage(userId, text, isMe) {
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = `msg-bubble ${isMe ? 'me' : 'other'}`;
+        div.innerHTML = `
+            <div class="sender-id">${userId === OWNER_ID ? 'Moderador / Owner' : 'ID: ' + userId.substring(0, 10)}</div>
+            <div>${text}</div>
+        `;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function addSystemMessage(text) {
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'system-msg';
+        div.innerText = `[System] ${text}`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function copyMyId() {
+        if (!myId) return;
+        navigator.clipboard.writeText(myId);
+        alert(`ID copiado: ${myId}`);
+    }
+
+    // --- COOKIE HELPERS ---
+    function setCookie(name, value, days) {
+        const d = new Date();
+        d.setTime(d.getTime() + (days*24*60*60*1000));
+        let expires = "expires="+ d.toUTCString();
+        document.cookie = name + "=" + value + ";" + expires + ";path=/";
+    }
+
+    function getCookie(name) {
+        let nameEQ = name + "=";
+        let ca = document.cookie.split(';');
+        for(let i=0;i < ca.length;i++) {
+            let c = ca[i];
+            while (c.charAt(0)==' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+        }
+        return null;
+    }
+
+    document.getElementById('chat-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMsg();
+    });
 </script>
 </body>
 </html>
