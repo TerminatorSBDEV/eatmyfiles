@@ -8,8 +8,8 @@
     <style>
         :root {
             --bg: #09090b;
-            --panel: #121214;
-            --border: #222226;
+            --panel: #18181b;
+            --border: #27272a;
             --accent: #00ff88;
             --accent-dim: rgba(0, 255, 136, 0.15);
             --blue: #58a6ff;
@@ -21,11 +21,10 @@
             margin: 0; padding: 0; height: 100%;
             background-color: var(--bg); color: var(--text);
             font-family: 'Segoe UI', system-ui, sans-serif;
-            display: flex; align-items: center; justify-content: center;
             overflow: hidden; touch-action: none;
         }
 
-        /* Modals / Overlays */
+        /* Telas de Bloqueio / Overlay */
         .overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.95);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -33,7 +32,7 @@
         }
 
         .card {
-            background: var(--panel); border: 1px solid var(--border); padding: 30px;
+            background: var(--panel); border: 1px solid var(--border); padding: 35px;
             border-radius: 12px; width: 90%; max-width: 450px; text-align: center;
             box-shadow: 0 15px 40px rgba(0,0,0,0.8);
         }
@@ -87,9 +86,8 @@
             position: relative; transition: opacity 0.2s;
         }
 
-        /* Transparência Dinâmica para Envio Pendente */
-        .msg-bubble.pending { opacity: 0.5; } /* 50% de transparência durante o envio [5] */
-        .msg-bubble.sent { opacity: 1; } /* 0% de transparência ao ser enviada [5] */
+        .msg-bubble.pending { opacity: 0.5; } 
+        .msg-bubble.sent { opacity: 1; } 
 
         .msg-container.me .msg-bubble {
             background: #152219; border-color: var(--accent-dim);
@@ -161,7 +159,7 @@
     <div id="overlay-sync" class="overlay">
         <div class="card" style="border-color: var(--border);">
             <h3 style="margin-bottom: 20px; color: var(--blue);">Synchronizing Secure Connection...</h3>
-            <div style="font-size:0.8rem; color:#71717a; font-family: monospace;">Syncing unique UserID with EzBridge.</div>
+            <div id="sync-subtext" style="font-size:0.8rem; color:#71717a; font-family: monospace;">Syncing unique UserID with EzBridge.</div>
         </div>
     </div>
 
@@ -207,7 +205,6 @@
                 </div>
                 <div style="font-size:0.75rem; color:#888;">people on this site: <span id="site-users-count" style="color:var(--blue); font-weight:bold;">0</span></div>
             </div>
-            <!-- Botão de Trocar Perfil -->
             <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto;" onclick="openProfileModal()">Change Profile</button>
         </div>
 
@@ -218,15 +215,12 @@
         <div id="typing-indicator"></div>
 
         <div class="input-bar">
-            <!-- Botão de Vídeos/GIFs -->
             <button class="icon-btn" onclick="triggerVideoUpload()">🎥</button>
             <input type="file" id="video-input" accept="video/*,image/gif" style="display:none;" onchange="handleMediaSelect(this, 'video')">
 
-            <!-- Botão de Fotos -->
             <button class="icon-btn" onclick="triggerImageUpload()">📷</button>
             <input type="file" id="image-input" accept="image/*" style="display:none;" onchange="handleImageSend(this)">
             
-            <!-- Botão de Áudio -->
             <button class="icon-btn" onclick="triggerAudioUpload()">🎶</button>
             <input type="file" id="audio-input" accept="audio/*" style="display:none;" onchange="handleMediaSelect(this, 'audio')">
 
@@ -236,22 +230,20 @@
     </div>
 
 <script>
-    // --- CREDENCIAIS ATUALIZADAS ---
+    // --- CREDENCIAIS ---
     const TUNNEL = "https://include-secondary-additions-resistance.trycloudflare.com";
     const VIRTUAL_SERVER_KEY = "55c130c22c";
     const OWNER_ID = "da0d3ac30047021752d9";
 
     let myId = getCookie("eb_owner_id") || "";
-    let socket = io(TUNNEL, { auth: { token: "default_key" }, transports: ['websocket'] });
+    let socket = io(TUNNEL, { auth: { token: "default_key" } });
 
     let banList = [];
+    let chatHistory = [];
     let isConnected = false;
     
     // Perfil do Usuário
-    let myProfile = {
-        name: "",
-        avatar: "" // base64
-    };
+    let myProfile = { name: "", avatar: "" };
 
     // Estados do digitador
     let isTyping = false;
@@ -259,9 +251,13 @@
     const activeTypers = new Set();
 
     // Configurações do Chunked Upload (Vídeo/Áudio)
-    const CHUNK_SIZE = 150 * 1024; // Fatias de 150KB
-    const pendingFileChunks = {}; // fileId -> array de chunks montando no receptor
-    const activeUploads = {}; // fileId -> DOM element de progresso local
+    const CHUNK_SIZE = 150 * 1024; 
+    const pendingFileChunks = {}; 
+    const activeUploads = {}; 
+
+    // --- COORDENADORES DO SISTEMA P2P LATENCY SYNC ---
+    let potentialSyncHosts = [];
+    let pingCheckTimeout = null;
 
     // Carrega perfil salvo localmente
     const savedProfile = localStorage.getItem('eb_user_profile');
@@ -280,7 +276,6 @@
         
         document.getElementById('my-id-display').innerText = `ID: ${myId.substring(0, 10)}`;
         document.getElementById('status-dot').classList.add('online');
-        document.getElementById('overlay-sync').style.display = 'none';
 
         socket.emit('join_virtual_server', { key: VIRTUAL_SERVER_KEY });
     });
@@ -288,13 +283,41 @@
     socket.on('joined_successfully', () => {
         isConnected = true;
         
-        // Se eu for o dono, carrego apenas a lista de banimentos física
-        if (myId === OWNER_ID) {
-            socket.emit('RemoteEvent', { type: 'ebdata_fetch_bans' });
-        } else {
-            // Solicita lista de banimentos atualizada para rede
-            socket.emit('RemoteEvent', { type: 'sync_request_bans', senderId: myId });
-        }
+        // Exibe status visual na tela de sync
+        const subtext = document.getElementById('sync-subtext');
+        subtext.innerText = "Querying fastest active peer for chat history...";
+
+        // Inicializa o barramento de sincronização por latência P2P
+        potentialSyncHosts = [];
+        socket.emit('RemoteEvent', {
+            type: 'sync_ping_request',
+            senderId: myId,
+            timestamp: Date.now(),
+            room: VIRTUAL_SERVER_KEY
+        });
+
+        // Janela de coleta de pings de 600ms para definir o melhor hospedeiro
+        pingCheckTimeout = setTimeout(() => {
+            document.getElementById('overlay-sync').style.display = 'none';
+            
+            if (potentialSyncHosts.length > 0) {
+                // Ordena os candidatos do menor para o maior ping
+                potentialSyncHosts.sort((a, b) => a.latency - b.latency);
+                const bestHost = potentialSyncHosts[0].id;
+                
+                addSystemMessage(`Sincronizando histórico com o peer mais rápido (ID: ${bestHost.substring(0, 5)} - ${potentialSyncHosts[0].latency}ms)...`);
+                
+                // Solicita o histórico diretamente para ele
+                socket.emit('RemoteEvent', {
+                    type: 'history_request_direct',
+                    targetId: bestHost,
+                    senderId: myId,
+                    room: VIRTUAL_SERVER_KEY
+                });
+            } else {
+                addSystemMessage("Nenhum peer ativo encontrado para sincronizar histórico. Iniciando chat limpo.");
+            }
+        }, 6000); // 600ms para celulares e redes rápidas (corrigido digitação para 600ms)
 
         // Loop de monitoramento de usuários online no site (a cada 5s)
         setInterval(() => {
@@ -322,37 +345,50 @@
     socket.on('RemoteEvent', (packet) => {
         if (!isConnected) return;
 
-        // Trata respostas do banco físico (Apenas banimentos)
-        if (packet.type === 'storage_response') {
-            const res = packet.result;
-            if (res && res.success === undefined) {
-                if (res.result && res.result.data) {
-                    if (packet.cmd_type === 'ebdata_fetch_bans') {
-                        banList = res.result.data;
-                        checkMyBanStatus();
-                    }
-                }
-            }
-        }
-
-        // Sincronização P2P de Banimentos
-        if (packet.type === 'sync_request_bans') {
-            if (banList.length > 0) {
+        // Tratar o pulso de teste de latência (Ping) de novos conexões
+        if (packet.type === 'sync_ping_request') {
+            // Se eu tenho histórico ativo de mensagens, me voluntario respondendo o ping
+            if (chatHistory.length > 0) {
                 socket.emit('RemoteEvent', {
-                    type: 'sync_response_bans',
+                    type: 'sync_ping_response',
                     targetId: packet.senderId,
-                    banList: banList
+                    senderId: myId,
+                    timestamp: packet.timestamp,
+                    room: VIRTUAL_SERVER_KEY
                 });
             }
         }
 
-        if (packet.type === 'sync_response_bans' && packet.targetId === myId) {
+        // Receber a resposta de ping e medir latência
+        if (packet.type === 'sync_ping_response' && packet.targetId === myId) {
+            const latency = Date.now() - packet.timestamp;
+            potentialSyncHosts.push({ id: packet.senderId, latency: latency });
+        }
+
+        // Se eu fui escolhido como o peer mais rápido, envio meu histórico para o novato
+        if (packet.type === 'history_request_direct' && packet.targetId === myId) {
+            socket.emit('RemoteEvent', {
+                type: 'history_payload_direct',
+                targetId: packet.senderId,
+                history: chatHistory,
+                banList: banList,
+                room: VIRTUAL_SERVER_KEY
+            });
+        }
+
+        // Se eu sou o novato e recebi os dados do peer mais rápido, carrego-os na tela
+        if (packet.type === 'history_payload_direct' && packet.targetId === myId) {
+            chatHistory = packet.history || [];
             banList = packet.banList || [];
             checkMyBanStatus();
+            renderChatHistory();
+            addSystemMessage("Sincronização concluída com sucesso!");
         }
 
         // Receber Mensagem Convencional ou de Imagem Leve (Ouvir)
         if (packet.type === 'chat_msg') {
+            chatHistory.push({ userId: packet.userId, text: packet.text, image: packet.image, profile: packet.profile });
+            limitHistoryAndDOM();
             appendMessage(packet.userId, packet.text, packet.userId === myId, packet.image, null, null, packet.profile);
         }
 
@@ -379,7 +415,22 @@
         if (packet.type === 'unban_broadcast') {
             banList = banList.filter(id => id !== packet.targetId);
         }
+
+        if (packet.type === 'clear_broadcast') {
+            chatHistory = [];
+            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico do chat foi limpo pelo moderador.</div>`;
+        }
     });
+
+    // Limita as mensagens na fila lógica e limpa o DOM para manter o limite estrito de 50 mensagens
+    function limitHistoryAndDOM() {
+        if (chatHistory.length > 50) chatHistory.shift();
+        
+        const container = document.getElementById('chat-messages');
+        while (container.children.length > 50) {
+            container.removeChild(container.firstChild);
+        }
+    }
 
     // --- LOGICA DE DIGITAÇÃO ---
     function handleTyping() {
@@ -440,7 +491,6 @@
         if (input.files.length === 0) return;
         const file = input.files[0];
 
-        // Limite rígido de 10MB
         if (file.size > 10 * 1024 * 1024) {
             alert("Media files must be under 10MB!");
             input.value = "";
@@ -452,12 +502,11 @@
             const base64Data = e.target.result;
             const fileId = "media_" + Date.now();
             
-            // 1. Cria bolha de mensagem local com 50% de opacidade (Pendente) [5]
+            // Cria bolha de mensagem local com 50% de opacidade (Pendente)
             const tempBubble = appendMessage(myId, `Uploading ${type}... 0%`, true, null, null, type, myProfile);
-            tempBubble.classList.add('pending'); // Define transparência inicial [5]
+            tempBubble.classList.add('pending'); 
             activeUploads[fileId] = tempBubble;
 
-            // 2. Dispara a fila de fatiamento sequencial autônoma (150KB por fatia)
             sendMediaChunks(base64Data, fileId, type);
             input.value = "";
         };
@@ -486,22 +535,19 @@
                     profile: myProfile
                 });
 
-                // Atualiza progresso da opacidade local
                 const pct = Math.floor((index / total) * 100);
                 if (activeUploads[fileId]) {
                     activeUploads[fileId].querySelector('.media-content-text').innerText = `Uploading ${type}... ${pct}%`;
                 }
 
                 index++;
-                setTimeout(next, 75); // Delay seguro de 75ms (Mantém ~13 reqs/s, abaixo de 15)
+                setTimeout(next, 75); 
             } else {
-                // Sucesso! Remove a marcação pendente e recupera opacidade sólida [5]
                 const bubble = activeUploads[fileId];
                 if (bubble) {
                     bubble.classList.remove('pending');
-                    bubble.classList.add('sent'); // Restaura para 0% de transparência (sólida) [5]
+                    bubble.classList.add('sent'); 
                     
-                    // Renderiza o player final
                     const container = bubble.querySelector('.media-content-text');
                     container.innerHTML = "";
                     if (type === 'video') {
@@ -510,13 +556,17 @@
                         container.innerHTML = `<audio src="${fullBase64}" controls style="max-width:100%; display:block;"></audio>`;
                     }
                 }
+                
+                // Grava na fila lógica de histórico local de 50 mensagens
+                chatHistory.push({ userId: myId, text: "", image: null, mediaBase64: fullBase64, mediaType: type, profile: myProfile });
+                limitHistoryAndDOM();
+
                 delete activeUploads[fileId];
             }
         }
         next();
     }
 
-    // Receptor dos pedaços de mídia dos outros jogadores
     function handleIncomingMediaChunk(packet) {
         const { fileId, index, total, data, mediaType, userId, profile } = packet;
 
@@ -526,17 +576,18 @@
 
         pendingFileChunks[fileId][index] = data;
 
-        // Se estiver completo, remonta
         if (pendingFileChunks[fileId].every(c => c !== null)) {
             const assembledBase64 = pendingFileChunks[fileId].join('');
             delete pendingFileChunks[fileId];
 
-            // Renderiza na tela para os espectadores
+            chatHistory.push({ userId, text: "", image: null, mediaBase64: assembledBase64, mediaType, profile });
+            limitHistoryAndDOM();
+
             appendMessage(userId, "", userId === myId, null, assembledBase64, mediaType, profile);
         }
     }
 
-    // --- ENVIAR FOTOS LEVES (MÁX 2MB) ---
+    // --- ENVIAR FOTOS LEVES ---
     function triggerImageUpload() { document.getElementById('image-input').click(); }
     
     function handleImageSend(input) {
@@ -553,11 +604,9 @@
         reader.onload = function(e) {
             const base64Img = e.target.result;
             
-            // Criar bolha pendente local [5]
             const tempBubble = appendMessage(myId, "", true, base64Img, null, null, myProfile);
             tempBubble.classList.add('pending');
 
-            // Envia via Socket e aguarda confirmação de entrega do Server para soltar a opacidade [5]
             socket.emit('RemoteEvent', {
                 type: 'chat_msg',
                 userId: myId,
@@ -565,10 +614,12 @@
                 image: base64Img,
                 profile: myProfile
             }, () => {
-                // Callback de confirmação: Remove transparência [5]
                 tempBubble.classList.remove('pending');
                 tempBubble.classList.add('sent');
             });
+
+            chatHistory.push({ userId: myId, text: "", image: base64Img, profile: myProfile });
+            limitHistoryAndDOM();
 
             input.value = "";
         };
@@ -581,7 +632,6 @@
         let text = input.value.trim();
         if (!text) return;
 
-        // Desliga status digitando
         isTyping = false;
         clearTimeout(typingTimeout);
         socket.emit('RemoteEvent', { type: 'typing_status', userId: myId, isTyping: false });
@@ -597,7 +647,6 @@
             return;
         }
 
-        // Criar bolha local de texto pendente [5]
         const tempBubble = appendMessage(myId, text, true, null, null, null, myProfile);
         tempBubble.classList.add('pending');
 
@@ -607,10 +656,12 @@
             text: text,
             profile: myProfile
         }, () => {
-            // Sucesso do servidor: Torna sólida [5]
             tempBubble.classList.remove('pending');
             tempBubble.classList.add('sent');
         });
+
+        chatHistory.push({ userId: myId, text: text, profile: myProfile });
+        limitHistoryAndDOM();
 
         input.value = "";
     }
@@ -643,7 +694,8 @@
             }
         }
         else if (cmd === "/clear") {
-            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico foi limpo.</div>`;
+            chatHistory = [];
+            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico foi limpo pelo moderador.</div>`;
             socket.emit('RemoteEvent', { type: 'clear_broadcast' });
         }
     }
@@ -664,27 +716,17 @@
         return partial;
     }
 
-    function checkMyBanStatus() {
-        if (banList.includes(myId)) {
-            document.getElementById('overlay-banned').style.display = 'flex';
-            socket.disconnect();
-        }
-    }
-
     // --- RENDERIZADOR VISUAL ---
     function appendMessage(userId, text, isMe, imageBase64, mediaBase64, mediaType, profile) {
         const container = document.getElementById('chat-messages');
         
-        // Elemento container que agrupa Avatar + Balão
         const msgContainer = document.createElement('div');
         msgContainer.className = `msg-container ${isMe ? 'me' : 'other'}`;
         
-        // Se for o Moderador, aplica estilo Matrix especial
         if (userId === OWNER_ID) {
             msgContainer.classList.add('owner-msg');
         }
 
-        // Renderiza PFP (Avatar) se existir no perfil, senão usa SVG padrão
         const avatarSrc = (profile && profile.avatar) ? profile.avatar : "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle><path d='M8 14s1.5 2 4 2 4-2 4-2'></path><line x1='9' y1='9' x2='9.01' y2='9'></line><line x1='15' y1='9' x2='15.01' y2='9'></line></svg>";
         const senderDisplayName = (profile && profile.name) ? profile.name : `ID: ${userId.substring(0, 10)}`;
 
@@ -718,7 +760,7 @@
         container.appendChild(msgContainer);
         container.scrollTop = container.scrollHeight;
 
-        return bubble; // Retorna referência do balão para controle de opacidade
+        return bubble; 
     }
 
     function finalizeLocalPendingMessage(fileId) {
@@ -729,6 +771,15 @@
         }
     }
 
+    function renderChatHistory() {
+        const container = document.getElementById('chat-messages');
+        container.innerHTML = "";
+        chatHistory.forEach(msg => {
+            appendMessage(msg.userId, msg.text, msg.userId === myId, msg.image, msg.mediaBase64, msg.mediaType, msg.profile);
+        });
+        limitHistoryAndDOM();
+    }
+
     function addSystemMessage(text) {
         const container = document.getElementById('chat-messages');
         const div = document.createElement('div');
@@ -736,6 +787,20 @@
         div.innerText = `[System] ${text}`;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
+        limitHistoryAndDOM();
+    }
+
+    function checkMyBanStatus() {
+        if (banList.includes(myId)) {
+            document.getElementById('overlay-banned').style.display = 'flex';
+            socket.disconnect();
+        }
+    }
+
+    function copyMyId() {
+        if (!myId) return;
+        navigator.clipboard.writeText(myId);
+        alert(`ID copiado: ${myId}`);
     }
 
     // --- COOKIE HELPERS ---
