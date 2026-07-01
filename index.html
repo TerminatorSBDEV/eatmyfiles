@@ -4,26 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EzBridge | Global Chat Room</title>
+    <script src="https://cdn.google.com/recaptcha/api.js" async defer></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root {
             --bg: #09090b;
-            --panel: #121214;
-            --border: #1f1f23;
+            --panel: #18181b;
+            --border: #27272a;
             --accent: #00ff88;
             --accent-dim: rgba(0, 255, 136, 0.15);
             --blue: #58a6ff;
             --error: #ff7b72;
             --text: #f4f4f5;
-            --vh: 100vh; /* Altura dinâmica para celular */
         }
 
         body, html {
             margin: 0; padding: 0; height: 100%;
             background-color: var(--bg); color: var(--text);
             font-family: 'Segoe UI', system-ui, sans-serif;
-            display: flex; align-items: center; justify-content: center;
-            overflow: hidden; touch-action: none;
+            overflow: hidden;
+            display: flex;
         }
 
         /* Telas de Bloqueio / Overlay */
@@ -34,8 +34,8 @@
         }
 
         .card {
-            background: var(--panel); border: 1px solid var(--border); padding: 30px;
-            border-radius: 12px; width: 90%; max-width: 420px; text-align: center;
+            background: var(--panel); border: 1px solid var(--border); padding: 35px;
+            border-radius: 12px; width: 90%; max-width: 450px; text-align: center;
             box-shadow: 0 15px 40px rgba(0,0,0,0.8);
         }
 
@@ -44,43 +44,19 @@
             box-shadow: 0 0 30px rgba(255, 123, 114, 0.2);
         }
 
-        /* Layout do Chat */
+        /* --- DESIGN RESPONSIVO PADRÃO (MOBILE FIRST) --- */
         .chat-layout {
             display: flex; flex-direction: column; 
-            width: 100vw; height: var(--vh);
+            width: 100vw; 
+            height: 100dvh; /* dvh evita que o teclado móvel quebre o layout */
             background: var(--panel);
             box-sizing: border-box;
-            transition: height 0.1s ease-out;
-        }
-
-        /* Painel direito do PC (Workspace Backdrop) */
-        .workspace-backdrop {
-            display: none; flex-grow: 1; height: 100vh;
-            flex-direction: column; justify-content: center; align-items: center;
-            background: var(--bg); color: #222; border-left: 1px solid var(--border);
-            text-align: center;
-        }
-        .workspace-backdrop h2 { color: #1a1a1e; margin: 0; letter-spacing: 2px; font-size: 2.2rem; }
-        .workspace-backdrop p { font-size: 0.9rem; color: #333; margin-top: 5px; font-family: monospace; }
-
-        /* Responsividade entre PC e Mobile */
-        @media (min-width: 769px) {
-            body {
-                justify-content: flex-start; /* Alinha o chat à esquerda no PC */
-            }
-            .chat-layout {
-                width: 420px; /* Largura compacta estilo sidebar */
-                border-right: 1px solid var(--border);
-            }
-            .workspace-backdrop {
-                display: flex; /* Exibe o fundo do workspace no PC */
-            }
         }
 
         .chat-header {
             padding: 15px; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
-            background: #09090b; height: 65px; box-sizing: border-box;
+            background: #09090b;
         }
 
         .status-dot {
@@ -147,26 +123,29 @@
         }
 
         #typing-indicator {
-            padding: 5px 15px; font-size: 0.8rem; color: var(--accent);
+            padding: 5px 20px; font-size: 0.8rem; color: var(--accent);
             font-style: italic; min-height: 20px; background: #09090b;
         }
 
+        /* Barra de Digitação com suporte a área segura do mobile */
         .input-bar {
-            padding: 12px 10px; border-top: 1px solid var(--border);
-            background: #09090b; display: flex; gap: 6px; align-items: center;
-            box-sizing: border-box;
+            padding: 15px; 
+            padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
+            border-top: 1px solid var(--border);
+            background: #09090b; display: flex; gap: 8px; align-items: center;
         }
 
         input {
             flex-grow: 1; background: #020204; border: 1px solid var(--border);
             color: white; padding: 12px; border-radius: 8px; outline: none;
-            font-size: 16px; /* Evita que o iOS dê zoom automático ao focar no campo */
+            font-size: 1rem; /* Tamanho 16px previne zoom automático de teclado no iOS */
             font-family: monospace;
+            box-sizing: border-box;
         }
         input:focus { border-color: var(--blue); }
 
         .btn {
-            background: var(--accent); color: black; border: none; padding: 12px 18px;
+            background: var(--accent); color: black; border: none; padding: 12px 20px;
             border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;
             height: 44px; display: flex; align-items: center; justify-content: center;
         }
@@ -175,13 +154,44 @@
         .icon-btn {
             background: transparent; border: 1px solid var(--border);
             color: var(--text); padding: 0; border-radius: 8px; cursor: pointer;
-            font-size: 1.1rem; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
             width: 44px; height: 44px; box-sizing: border-box;
+            flex-shrink: 0;
         }
         .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
 
         .setup-row { display: flex; gap: 10px; margin-top: 5px; }
         .setup-row input { text-align: left; }
+
+        /* --- MEDIA QUERY: DISPOSITIVOS MÓVEIS (AJUSTES ADICIONAIS) --- */
+        @media (max-width: 767px) {
+            .chat-layout {
+                width: 100%;
+                height: 100dvh;
+            }
+            .input-bar {
+                padding: 10px;
+                gap: 6px;
+            }
+        }
+
+        /* --- MEDIA QUERY: DESTOP / PC (ALINHAMENTO À ESQUERDA) --- */
+        @media (min-width: 768px) {
+            body {
+                justify-content: flex-start; /* Alinha o layout à esquerda no monitor */
+            }
+            .chat-layout {
+                width: 400px; /* Transforma o chat em uma barra lateral limpa */
+                max-width: 400px;
+                height: 100vh;
+                border-right: 1px solid var(--border);
+            }
+            /* Mantém os overlays/modais centralizados no monitor inteiro */
+            .overlay {
+                justify-content: center;
+                align-items: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -190,7 +200,7 @@
     <div id="overlay-sync" class="overlay">
         <div class="card" style="border-color: var(--border);">
             <h3 style="margin-bottom: 20px; color: var(--blue);">Synchronizing Secure Connection...</h3>
-            <div id="sync-subtext" style="font-size:0.8rem; color:#71717a; font-family: monospace;">Syncing unique UserID with EzBridge.</div>
+            <div style="font-size:0.8rem; color:#71717a; font-family: monospace;">Syncing unique UserID with EzBridge.</div>
         </div>
     </div>
 
@@ -226,17 +236,17 @@
         </div>
     </div>
 
-    <!-- Layout do Chat Room (Lado Esquerdo no PC / Tela Cheia no Mobile) -->
-    <div class="chat-layout" id="chat-layout">
+    <!-- Layout do Chat Room -->
+    <div class="chat-layout">
         <div class="chat-header">
-            <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="display:flex; flex-direction:column; gap:4px;">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <div id="status-dot" class="status-dot"></div>
                     <span style="font-weight: bold; font-size: 0.95rem;" id="my-id-display">Connecting...</span>
                 </div>
                 <div style="font-size:0.75rem; color:#888;">people on this site: <span id="site-users-count" style="color:var(--blue); font-weight:bold;">0</span></div>
             </div>
-            <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto; height:32px;" onclick="openProfileModal()">Change Profile</button>
+            <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto; height: auto;" onclick="openProfileModal()">Change Profile</button>
         </div>
 
         <div id="chat-messages" class="chat-messages">
@@ -246,27 +256,18 @@
         <div id="typing-indicator"></div>
 
         <div class="input-bar">
-            <!-- Botão de Vídeos/GIFs -->
             <button class="icon-btn" onclick="triggerVideoUpload()">🎥</button>
             <input type="file" id="video-input" accept="video/*,image/gif" style="display:none;" onchange="handleMediaSelect(this, 'video')">
 
-            <!-- Botão de Fotos -->
             <button class="icon-btn" onclick="triggerImageUpload()">📷</button>
             <input type="file" id="image-input" accept="image/*" style="display:none;" onchange="handleImageSend(this)">
             
-            <!-- Botão de Áudio -->
             <button class="icon-btn" onclick="triggerAudioUpload()">🎶</button>
             <input type="file" id="audio-input" accept="audio/*" style="display:none;" onchange="handleMediaSelect(this, 'audio')">
 
             <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" oninput="handleTyping()">
             <button class="btn" onclick="sendMsg()">Send</button>
         </div>
-    </div>
-
-    <!-- Backdrop do Workspace do PC (Fundo direito) -->
-    <div class="workspace-backdrop">
-        <h2>EZBRIDGE CHAT WORKSPACE</h2>
-        <p>Dynamic Session Active | Monitoring real-time nodes.</p>
     </div>
 
 <script>
@@ -279,51 +280,25 @@
     let socket = io(TUNNEL, { auth: { token: "default_key" }, transports: ['websocket'] });
 
     let banList = [];
-    let chatHistory = [];
     let isConnected = false;
     
-    // Perfil do Usuário
     let myProfile = { name: "", avatar: "" };
 
-    // Estados do digitador
     let isTyping = false;
     let typingTimeout = null;
     const activeTypers = new Set();
 
-    // Configurações do Chunked Upload (Vídeo/Áudio)
     const CHUNK_SIZE = 150 * 1024; 
     const pendingFileChunks = {}; 
     const activeUploads = {}; 
 
-    // Coordenadores do P2P Latency Sync
     let potentialSyncHosts = [];
     let pingCheckTimeout = null;
 
-    // Carrega perfil salvo localmente
     const savedProfile = localStorage.getItem('eb_user_profile');
     if (savedProfile) {
         try { myProfile = JSON.parse(savedProfile); } catch(e) {}
     }
-
-    // --- CORREÇÃO DE DESIGN MÓVEL (WAKE-LOCK DE VIEWPORT E KEYBOARD RESIZING) ---
-    function resetViewportHeight() {
-        // Se a API visual do teclado estiver disponível, usa o tamanho real livre do teclado
-        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-        
-        // Mantém a rolagem sempre no final ao abrir o teclado
-        const container = document.getElementById('chat-messages');
-        if (container) {
-            container.scrollTop = container.scrollHeight;
-        }
-    }
-
-    window.addEventListener('resize', resetViewportHeight);
-    if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', resetViewportHeight);
-        window.visualViewport.addEventListener('scroll', resetViewportHeight);
-    }
-    resetViewportHeight(); // Inicializa no primeiro carregamento
 
     // --- CONEXÃO E IDENTIFICAÇÃO ---
     socket.on('connect', () => {
@@ -336,6 +311,7 @@
         
         document.getElementById('my-id-display').innerText = `ID: ${myId.substring(0, 10)}`;
         document.getElementById('status-dot').classList.add('online');
+        document.getElementById('overlay-sync').style.display = 'none';
 
         socket.emit('join_virtual_server', { key: VIRTUAL_SERVER_KEY });
     });
@@ -343,9 +319,6 @@
     socket.on('joined_successfully', () => {
         isConnected = true;
         
-        const subtext = document.getElementById('sync-subtext');
-        subtext.innerText = "Querying fastest active peer for chat history...";
-
         potentialSyncHosts = [];
         socket.emit('RemoteEvent', {
             type: 'sync_ping_request',
@@ -354,15 +327,11 @@
             room: VIRTUAL_SERVER_KEY
         });
 
-        // Janela de coleta de pings para definir o melhor hospedeiro
         pingCheckTimeout = setTimeout(() => {
-            document.getElementById('overlay-sync').style.display = 'none';
-            
             if (potentialSyncHosts.length > 0) {
                 potentialSyncHosts.sort((a, b) => a.latency - b.latency);
                 const bestHost = potentialSyncHosts[0].id;
-                
-                addSystemMessage(`Sincronizando histórico com o peer mais rápido (ID: ${bestHost.substring(0, 5)} - ${potentialSyncHosts[0].latency}ms)...`);
+                addSystemMessage(`Sincronizando histórico com o peer mais rápido (ID: ${bestHost.substring(0, 5)})...`);
                 
                 socket.emit('RemoteEvent', {
                     type: 'history_request_direct',
@@ -371,9 +340,8 @@
                     room: VIRTUAL_SERVER_KEY
                 });
             } else {
-                addSystemMessage("Nenhum peer ativo encontrado para sincronizar histórico. Iniciando chat limpo.");
+                addSystemMessage("Iniciando chat em tempo real.");
             }
-            resetViewportHeight();
         }, 600);
 
         setInterval(() => {
@@ -433,7 +401,7 @@
             banList = packet.banList || [];
             checkMyBanStatus();
             renderChatHistory();
-            addSystemMessage("Sincronização concluída com sucesso!");
+            addSystemMessage("Histórico sincronizado com sucesso.");
         }
 
         if (packet.type === 'chat_msg') {
@@ -466,7 +434,7 @@
 
         if (packet.type === 'clear_broadcast') {
             chatHistory = [];
-            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico foi limpo pelo moderador.</div>`;
+            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico foi limpo.</div>`;
         }
     });
 
@@ -503,7 +471,7 @@
         }
     }
 
-    // --- CONFIGURAÇÃO E UPDATE DO PERFIL ---
+    // --- CONFIGURAÇÃO E PERFIL ---
     function openProfileModal() {
         document.getElementById('modal-profile').style.display = 'flex';
         document.getElementById('profile-name-input').value = myProfile.name;
@@ -526,7 +494,7 @@
         myProfile.name = document.getElementById('profile-name-input').value.trim().substring(0, 20);
         localStorage.setItem('eb_user_profile', JSON.stringify(myProfile));
         closeProfileModal();
-        addSystemMessage("Seu perfil foi atualizado com sucesso localmente.");
+        addSystemMessage("Seu perfil foi atualizado.");
     }
 
     // --- PROCESSAMENTO E ENVIO EM CHUNKS (ÁUDIO / VÍDEO) ---
@@ -604,7 +572,6 @@
                 
                 chatHistory.push({ userId: myId, text: "", image: null, mediaBase64: fullBase64, mediaType: type, profile: myProfile });
                 limitHistoryAndDOM();
-
                 delete activeUploads[fileId];
             }
         }
@@ -639,7 +606,7 @@
         const file = input.files[0];
 
         if (file.size > 2 * 1024 * 1024) {
-            alert("Images sent via camera button must be under 2MB! Use video/gif button for larger ones.");
+            alert("Images must be under 2MB!");
             input.value = "";
             return;
         }
@@ -815,6 +782,7 @@
         }
     }
 
+    // Carrega o histórico na tela limpando mensagens excessivas
     function renderChatHistory() {
         const container = document.getElementById('chat-messages');
         container.innerHTML = "";
