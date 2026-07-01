@@ -2,28 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>EzBridge | Global Chat Room</title>
-    <script src="https://cdn.google.com/recaptcha/api.js" async defer></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root {
-            --bg: #09090b;
-            --panel: #18181b;
-            --border: #27272a;
-            --accent: #00ff88;
-            --accent-dim: rgba(0, 255, 136, 0.15);
-            --blue: #58a6ff;
-            --error: #ff7b72;
-            --text: #f4f4f5;
+            --bg: #030303;
+            --panel: #0d0d11;
+            --border: #1a1a24;
+            --accent: #ff007f; /* Rosa Neon */
+            --accent-dim: rgba(255, 0, 127, 0.15);
+            --blue: #00f0ff; /* Azul Neon */
+            --text: #ffffff;
         }
 
         body, html {
             margin: 0; padding: 0; height: 100%;
             background-color: var(--bg); color: var(--text);
             font-family: 'Segoe UI', system-ui, sans-serif;
-            overflow: hidden;
+            overflow: hidden; touch-action: none;
+        }
+
+        body {
             display: flex;
+            justify-content: flex-start; /* Alinhado à esquerda no PC */
+            align-items: stretch;
+            background-image: radial-gradient(circle at 75% 50%, rgba(0, 240, 255, 0.05) 0%, transparent 60%);
         }
 
         /* Telas de Bloqueio / Overlay */
@@ -34,9 +38,9 @@
         }
 
         .card {
-            background: var(--panel); border: 1px solid var(--border); padding: 35px;
-            border-radius: 12px; width: 90%; max-width: 450px; text-align: center;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+            background: var(--panel); border: 2px solid var(--border); padding: 35px;
+            border-radius: 16px; text-align: center; width: 90%; max-width: 320px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
         }
 
         #ban-screen {
@@ -44,12 +48,11 @@
             box-shadow: 0 0 30px rgba(255, 123, 114, 0.2);
         }
 
-        /* --- DESIGN RESPONSIVO PADRÃO (MOBILE FIRST) --- */
+        /* Layout do Chat */
         .chat-layout {
-            display: flex; flex-direction: column; 
-            width: 100vw; 
-            height: 100dvh; /* dvh evita que o teclado móvel quebre o layout */
-            background: var(--panel);
+            display: flex; flex-direction: column; width: 100vw; height: 100%;
+            max-width: 480px; border-right: 1px solid var(--border);
+            background: var(--panel); box-shadow: 10px 0 30px rgba(0,0,0,0.7);
             box-sizing: border-box;
         }
 
@@ -67,7 +70,7 @@
         }
 
         .chat-messages {
-            flex-grow: 1; overflow-y: auto; padding: 15px;
+            flex-grow: 1; overflow-y: auto; padding: 20px;
             display: flex; flex-direction: column; gap: 15px;
         }
 
@@ -94,7 +97,7 @@
         .msg-bubble.sent { opacity: 1; } 
 
         .msg-container.me .msg-bubble {
-            background: #152219; border-color: var(--accent-dim);
+            background: #221217; border-color: var(--accent-dim);
             border-top-right-radius: 2px;
         }
         .msg-container.other .msg-bubble {
@@ -127,69 +130,48 @@
             font-style: italic; min-height: 20px; background: #09090b;
         }
 
-        /* Barra de Digitação com suporte a área segura do mobile */
         .input-bar {
-            padding: 15px; 
-            padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
-            border-top: 1px solid var(--border);
+            padding: 15px; border-top: 1px solid var(--border);
             background: #09090b; display: flex; gap: 8px; align-items: center;
         }
 
         input {
             flex-grow: 1; background: #020204; border: 1px solid var(--border);
             color: white; padding: 12px; border-radius: 8px; outline: none;
-            font-size: 1rem; /* Tamanho 16px previne zoom automático de teclado no iOS */
-            font-family: monospace;
-            box-sizing: border-box;
+            font-size: 0.95rem; font-family: monospace;
         }
         input:focus { border-color: var(--blue); }
 
         .btn {
-            background: var(--accent); color: black; border: none; padding: 12px 20px;
+            background: var(--accent); color: white; border: none; padding: 12px 20px;
             border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;
-            height: 44px; display: flex; align-items: center; justify-content: center;
         }
-        .btn:hover { background: #00cc6a; }
+        .btn:hover { background: #e0006c; }
 
         .icon-btn {
             background: transparent; border: 1px solid var(--border);
-            color: var(--text); padding: 0; border-radius: 8px; cursor: pointer;
+            color: var(--text); padding: 10px; border-radius: 8px; cursor: pointer;
             font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
-            width: 44px; height: 44px; box-sizing: border-box;
-            flex-shrink: 0;
+            width: 42px; height: 42px; box-sizing: border-box;
         }
         .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
 
         .setup-row { display: flex; gap: 10px; margin-top: 5px; }
         .setup-row input { text-align: left; }
 
-        /* --- MEDIA QUERY: DISPOSITIVOS MÓVEIS (AJUSTES ADICIONAIS) --- */
-        @media (max-width: 767px) {
+        /* RESPONSIVIDADE MOBILE */
+        @media (max-width: 768px) {
+            body {
+                justify-content: center; /* Centralizado no celular */
+            }
             .chat-layout {
-                width: 100%;
-                height: 100dvh;
+                max-width: 100%;
+                width: 100vw;
+                height: 100dvh; /* Evita que o teclado empurre o input para fora do topo da janela de exibição */
+                border: none;
             }
             .input-bar {
-                padding: 10px;
-                gap: 6px;
-            }
-        }
-
-        /* --- MEDIA QUERY: DESTOP / PC (ALINHAMENTO À ESQUERDA) --- */
-        @media (min-width: 768px) {
-            body {
-                justify-content: flex-start; /* Alinha o layout à esquerda no monitor */
-            }
-            .chat-layout {
-                width: 400px; /* Transforma o chat em uma barra lateral limpa */
-                max-width: 400px;
-                height: 100vh;
-                border-right: 1px solid var(--border);
-            }
-            /* Mantém os overlays/modais centralizados no monitor inteiro */
-            .overlay {
-                justify-content: center;
-                align-items: center;
+                padding: 12px 12px 24px 12px; /* Margem inferior de segurança contra barras físicas do celular */
             }
         }
     </style>
@@ -231,22 +213,24 @@
                 <label style="font-size: 0.75rem; color: #888;">YOUR NAME (MAX 20 CHARS)</label>
                 <input type="text" id="profile-name-input" placeholder="Leave blank for your ID" maxlength="20">
             </div>
-            <button class="btn btn-blue" onclick="updateProfileSubmit()">[UPDATE PROFILE]</button>
-            <button class="btn btn-secondary" onclick="closeProfileModal()">Cancel</button>
+            <button class="btn btn-blue" type="button" onclick="updateProfileSubmit()">[UPDATE PROFILE]</button>
+            <button class="btn btn-secondary" type="button" onclick="closeProfileModal()">Cancel</button>
         </div>
     </div>
 
     <!-- Layout do Chat Room -->
     <div class="chat-layout">
         <div class="chat-header">
-            <div style="display:flex; flex-direction:column; gap:4px;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <div id="status-dot" class="status-dot"></div>
-                    <span style="font-weight: bold; font-size: 0.95rem;" id="my-id-display">Connecting...</span>
-                </div>
-                <div style="font-size:0.75rem; color:#888;">people on this site: <span id="site-users-count" style="color:var(--blue); font-weight:bold;">0</span></div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div id="status-dot" class="status-dot"></div>
+                <span style="font-weight: bold; font-size: 0.95rem;" id="my-id-display">Connecting...</span>
             </div>
-            <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto; height: auto;" onclick="openProfileModal()">Change Profile</button>
+            <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto;" onclick="openProfileModal()">Profile</button>
+        </div>
+
+        <div style="padding: 10px 20px; font-size: 0.75rem; color: #71717a; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between;">
+            <div>People on this site: <span id="site-users-count" style="color:var(--blue); font-weight:bold;">0</span></div>
+            <div style="cursor: pointer; text-decoration: underline;" onclick="copyMyId()">Copy My User ID</div>
         </div>
 
         <div id="chat-messages" class="chat-messages">
@@ -263,7 +247,7 @@
             <input type="file" id="image-input" accept="image/*" style="display:none;" onchange="handleImageSend(this)">
             
             <button class="icon-btn" onclick="triggerAudioUpload()">🎶</button>
-            <input type="file" id="audio-input" accept="audio/*" style="display:none;" onchange="handleMediaSelect(this, 'audio')">
+            <input type="file" id="audio-input" accept="audio/*, .mp3, .wav, .ogg, .m4a" style="display:none;" onchange="handleMediaSelect(this, 'audio')">
 
             <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" oninput="handleTyping()">
             <button class="btn" onclick="sendMsg()">Send</button>
@@ -273,22 +257,23 @@
 <script>
     // --- CREDENCIAIS ---
     const TUNNEL = "https://favour-fighting-headphones-enhancement.trycloudflare.com";
-    const VIRTUAL_SERVER_KEY = "55c130c22c";
+    const VIRTUAL_SERVER_KEY = "13c25d9dae";
     const OWNER_ID = "da0d3ac30047021752d9";
 
     let myId = getCookie("eb_owner_id") || "";
-    let socket = io(TUNNEL, { auth: { token: "default_key" }, transports: ['websocket'] });
+    let socket = io(TUNNEL, { auth: { token: "default_key" } });
 
     let banList = [];
+    let chatHistory = [];
     let isConnected = false;
     
     let myProfile = { name: "", avatar: "" };
 
     let isTyping = false;
     let typingTimeout = null;
-    const activeTypers = new Set();
+    const activeTyperElements = {}; // Alinhado para exibir quem está digitando
 
-    const CHUNK_SIZE = 150 * 1024; 
+    const CHUNK_SIZE = 100 * 1024; 
     const pendingFileChunks = {}; 
     const activeUploads = {}; 
 
@@ -319,30 +304,11 @@
     socket.on('joined_successfully', () => {
         isConnected = true;
         
-        potentialSyncHosts = [];
-        socket.emit('RemoteEvent', {
-            type: 'sync_ping_request',
-            senderId: myId,
-            timestamp: Date.now(),
-            room: VIRTUAL_SERVER_KEY
-        });
-
-        pingCheckTimeout = setTimeout(() => {
-            if (potentialSyncHosts.length > 0) {
-                potentialSyncHosts.sort((a, b) => a.latency - b.latency);
-                const bestHost = potentialSyncHosts[0].id;
-                addSystemMessage(`Sincronizando histórico com o peer mais rápido (ID: ${bestHost.substring(0, 5)})...`);
-                
-                socket.emit('RemoteEvent', {
-                    type: 'history_request_direct',
-                    targetId: bestHost,
-                    senderId: myId,
-                    room: VIRTUAL_SERVER_KEY
-                });
-            } else {
-                addSystemMessage("Iniciando chat em tempo real.");
-            }
-        }, 600);
+        if (myId === OWNER_ID) {
+            socket.emit('RemoteEvent', { type: 'ebdata_fetch_bans' });
+        } else {
+            socket.emit('RemoteEvent', { type: 'sync_request_bans', senderId: myId });
+        }
 
         setInterval(() => {
             if (isConnected) {
@@ -369,44 +335,34 @@
     socket.on('RemoteEvent', (packet) => {
         if (!isConnected) return;
 
-        if (packet.type === 'sync_ping_request') {
-            if (chatHistory.length > 0) {
+        if (packet.type === 'storage_response') {
+            const res = packet.result;
+            if (res && res.success === undefined) {
+                if (res.result && res.result.data) {
+                    if (packet.cmd_type === 'ebdata_fetch_bans') {
+                        banList = res.result.data;
+                        checkMyBanStatus();
+                    }
+                }
+            }
+        }
+
+        if (packet.type === 'sync_request_bans') {
+            if (banList.length > 0) {
                 socket.emit('RemoteEvent', {
-                    type: 'sync_ping_response',
+                    type: 'sync_response_bans',
                     targetId: packet.senderId,
-                    senderId: myId,
-                    timestamp: packet.timestamp,
-                    room: VIRTUAL_SERVER_KEY
+                    banList: banList
                 });
             }
         }
 
-        if (packet.type === 'sync_ping_response' && packet.targetId === myId) {
-            const latency = Date.now() - packet.timestamp;
-            potentialSyncHosts.push({ id: packet.senderId, latency: latency });
-        }
-
-        if (packet.type === 'history_request_direct' && packet.targetId === myId) {
-            socket.emit('RemoteEvent', {
-                type: 'history_payload_direct',
-                targetId: packet.senderId,
-                history: chatHistory,
-                banList: banList,
-                room: VIRTUAL_SERVER_KEY
-            });
-        }
-
-        if (packet.type === 'history_payload_direct' && packet.targetId === myId) {
-            chatHistory = packet.history || [];
+        if (packet.type === 'sync_response_bans' && packet.targetId === myId) {
             banList = packet.banList || [];
             checkMyBanStatus();
-            renderChatHistory();
-            addSystemMessage("Histórico sincronizado com sucesso.");
         }
 
         if (packet.type === 'chat_msg') {
-            chatHistory.push({ userId: packet.userId, text: packet.text, image: packet.image, profile: packet.profile });
-            limitHistoryAndDOM();
             appendMessage(packet.userId, packet.text, packet.userId === myId, packet.image, null, null, packet.profile);
         }
 
@@ -415,12 +371,17 @@
         }
 
         if (packet.type === 'typing_status') {
+            const indicator = document.getElementById('typing-indicator');
+            const authorName = (packet.profile && packet.profile.name) ? packet.profile.name : `ID: ${packet.userId.substring(0, 10)}`;
+            
             if (packet.isTyping) {
-                activeTypers.add(packet.userId);
+                activeTyperElements[packet.userId] = `${authorName} is typing...`;
             } else {
-                activeTypers.delete(packet.userId);
+                delete activeTyperElements[packet.userId];
             }
-            updateTypingDisplay();
+            
+            const typers = Object.values(activeTyperElements);
+            indicator.innerText = typers.length > 0 ? typers.join(', ') : "";
         }
 
         if (packet.type === 'ban_broadcast') {
@@ -439,7 +400,6 @@
     });
 
     function limitHistoryAndDOM() {
-        if (chatHistory.length > 50) chatHistory.shift();
         const container = document.getElementById('chat-messages');
         while (container.children.length > 50) {
             container.removeChild(container.firstChild);
@@ -460,18 +420,7 @@
         }, 3000);
     }
 
-    function updateTypingDisplay() {
-        const indicator = document.getElementById('typing-indicator');
-        const typersArray = Array.from(activeTypers).filter(id => id !== myId);
-        
-        if (typersArray.length > 0) {
-            indicator.innerText = typersArray.map(id => `ID: ${id.substring(0, 10)} is typing...`).join(', ');
-        } else {
-            indicator.innerText = "";
-        }
-    }
-
-    // --- CONFIGURAÇÃO E PERFIL ---
+    // --- CONFIGURAÇÃO E UPDATE DO PERFIL ---
     function openProfileModal() {
         document.getElementById('modal-profile').style.display = 'flex';
         document.getElementById('profile-name-input').value = myProfile.name;
@@ -494,7 +443,7 @@
         myProfile.name = document.getElementById('profile-name-input').value.trim().substring(0, 20);
         localStorage.setItem('eb_user_profile', JSON.stringify(myProfile));
         closeProfileModal();
-        addSystemMessage("Seu perfil foi atualizado.");
+        addSystemMessage("Seu perfil foi atualizado com sucesso localmente.");
     }
 
     // --- PROCESSAMENTO E ENVIO EM CHUNKS (ÁUDIO / VÍDEO) ---
@@ -516,6 +465,7 @@
             const base64Data = e.target.result;
             const fileId = "media_" + Date.now();
             
+            // Criar bolha local pendente (50% de opacidade) [5]
             const tempBubble = appendMessage(myId, `Uploading ${type}... 0%`, true, null, null, type, myProfile);
             tempBubble.classList.add('pending'); 
             activeUploads[fileId] = tempBubble;
@@ -559,7 +509,7 @@
                 const bubble = activeUploads[fileId];
                 if (bubble) {
                     bubble.classList.remove('pending');
-                    bubble.classList.add('sent'); 
+                    bubble.classList.add('sent'); // Torna opaco (100%) [5]
                     
                     const container = bubble.querySelector('.media-content-text');
                     container.innerHTML = "";
@@ -569,8 +519,6 @@
                         container.innerHTML = `<audio src="${fullBase64}" controls style="max-width:100%; display:block;"></audio>`;
                     }
                 }
-                
-                chatHistory.push({ userId: myId, text: "", image: null, mediaBase64: fullBase64, mediaType: type, profile: myProfile });
                 limitHistoryAndDOM();
                 delete activeUploads[fileId];
             }
@@ -591,9 +539,7 @@
             const assembledBase64 = pendingFileChunks[fileId].join('');
             delete pendingFileChunks[fileId];
 
-            chatHistory.push({ userId, text: "", image: null, mediaBase64: assembledBase64, mediaType, profile });
             limitHistoryAndDOM();
-
             appendMessage(userId, "", userId === myId, null, assembledBase64, mediaType, profile);
         }
     }
@@ -606,7 +552,7 @@
         const file = input.files[0];
 
         if (file.size > 2 * 1024 * 1024) {
-            alert("Images must be under 2MB!");
+            alert("Images must be under 2MB! Use video/gif button for larger ones.");
             input.value = "";
             return;
         }
@@ -618,6 +564,7 @@
             const tempBubble = appendMessage(myId, "", true, base64Img, null, null, myProfile);
             tempBubble.classList.add('pending');
 
+            // Feedback visual: solta a opacidade apenas quando o servidor confirmar entrega [5]
             socket.emit('RemoteEvent', {
                 type: 'chat_msg',
                 userId: myId,
@@ -629,9 +576,7 @@
                 tempBubble.classList.add('sent');
             });
 
-            chatHistory.push({ userId: myId, text: "", image: base64Img, profile: myProfile });
             limitHistoryAndDOM();
-
             input.value = "";
         };
         reader.readAsDataURL(file);
@@ -658,6 +603,7 @@
             return;
         }
 
+        // Criar bolha pendente local com 50% de opacidade [5]
         const tempBubble = appendMessage(myId, text, true, null, null, null, myProfile);
         tempBubble.classList.add('pending');
 
@@ -667,13 +613,12 @@
             text: text,
             profile: myProfile
         }, () => {
+            // Callback do Servidor: remove transparência [5]
             tempBubble.classList.remove('pending');
             tempBubble.classList.add('sent');
         });
 
-        chatHistory.push({ userId: myId, text: text, profile: myProfile });
         limitHistoryAndDOM();
-
         input.value = "";
     }
 
@@ -705,7 +650,6 @@
             }
         }
         else if (cmd === "/clear") {
-            chatHistory = [];
             document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico foi limpo pelo moderador.</div>`;
             socket.emit('RemoteEvent', { type: 'clear_broadcast' });
         }
@@ -772,24 +716,6 @@
         container.scrollTop = container.scrollHeight;
 
         return bubble; 
-    }
-
-    function finalizeLocalPendingMessage(fileId) {
-        const bubble = activeUploads[fileId];
-        if (bubble) {
-            bubble.classList.remove('pending');
-            bubble.classList.add('sent');
-        }
-    }
-
-    // Carrega o histórico na tela limpando mensagens excessivas
-    function renderChatHistory() {
-        const container = document.getElementById('chat-messages');
-        container.innerHTML = "";
-        chatHistory.forEach(msg => {
-            appendMessage(msg.userId, msg.text, msg.userId === myId, msg.image, msg.mediaBase64, msg.mediaType, msg.profile);
-        });
-        limitHistoryAndDOM();
     }
 
     function addSystemMessage(text) {
