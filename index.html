@@ -7,27 +7,26 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root {
-            --bg: #030303;
-            --panel: #0d0d11;
-            --border: #1a1a24;
-            --accent: #ff007f; /* Rosa Neon */
-            --accent-dim: rgba(255, 0, 127, 0.15);
-            --blue: #00f0ff; /* Azul Neon */
-            --text: #ffffff;
+            --bg: #09090b;
+            --panel: #121214;
+            --border: #222226;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.15);
+            --blue: #58a6ff;
+            --error: #ff7b72;
+            --text: #f4f4f5;
         }
 
         body, html {
-            margin: 0; padding: 0; height: 100%;
+            margin: 0; padding: 0; 
+            width: 100vw;
+            height: 100dvh; /* Altura de viewport dinâmica para evitar cortes em celulares */
             background-color: var(--bg); color: var(--text);
             font-family: 'Segoe UI', system-ui, sans-serif;
-            overflow: hidden; touch-action: none;
-        }
-
-        body {
             display: flex;
-            justify-content: flex-start; /* Alinhado à esquerda no PC */
-            align-items: stretch;
-            background-image: radial-gradient(circle at 75% 50%, rgba(0, 240, 255, 0.05) 0%, transparent 60%);
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
         }
 
         /* Telas de Bloqueio / Overlay */
@@ -38,9 +37,9 @@
         }
 
         .card {
-            background: var(--panel); border: 2px solid var(--border); padding: 35px;
-            border-radius: 16px; text-align: center; width: 90%; max-width: 320px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            background: var(--panel); border: 1px solid var(--border); padding: 30px;
+            border-radius: 12px; width: 90%; max-width: 450px; text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.8);
         }
 
         #ban-screen {
@@ -48,17 +47,36 @@
             box-shadow: 0 0 30px rgba(255, 123, 114, 0.2);
         }
 
-        /* Layout do Chat */
+        /* Layout do Chat Adaptativo e Centralizado */
         .chat-layout {
-            display: flex; flex-direction: column; width: 100vw; height: 100%;
-            max-width: 480px; border-right: 1px solid var(--border);
-            background: var(--panel); box-shadow: 10px 0 30px rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            height: 100dvh; /* Acompanha o teclado virtual no celular */
+            max-width: 800px; /* Mais largo e elegante no computador */
+            border-right: 1px solid var(--border);
+            border-left: 1px solid var(--border);
+            background: var(--panel);
+            position: relative;
             box-sizing: border-box;
         }
 
+        /* Ajustes responsivos para telas menores (celulares) */
+        @media (max-width: 768px) {
+            .chat-layout {
+                max-width: 100vw;
+                border-right: none;
+                border-left: none;
+            }
+        }
+
         .chat-header {
-            padding: 15px; border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px;
+            padding-top: calc(15px + env(safe-area-inset-top)); /* Evita o "notch" de celulares modernos */
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             background: #09090b;
         }
 
@@ -97,7 +115,7 @@
         .msg-bubble.sent { opacity: 1; } 
 
         .msg-container.me .msg-bubble {
-            background: #221217; border-color: var(--accent-dim);
+            background: #152219; border-color: var(--accent-dim);
             border-top-right-radius: 2px;
         }
         .msg-container.other .msg-bubble {
@@ -131,7 +149,9 @@
         }
 
         .input-bar {
-            padding: 15px; border-top: 1px solid var(--border);
+            padding: 15px;
+            padding-bottom: calc(15px + env(safe-area-inset-bottom)); /* Impede que o teclado virtual mobile cubra a barra */
+            border-top: 1px solid var(--border);
             background: #09090b; display: flex; gap: 8px; align-items: center;
         }
 
@@ -143,10 +163,10 @@
         input:focus { border-color: var(--blue); }
 
         .btn {
-            background: var(--accent); color: white; border: none; padding: 12px 20px;
+            background: var(--accent); color: black; border: none; padding: 12px 20px;
             border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;
         }
-        .btn:hover { background: #e0006c; }
+        .btn:hover { background: #00cc6a; }
 
         .icon-btn {
             background: transparent; border: 1px solid var(--border);
@@ -158,22 +178,6 @@
 
         .setup-row { display: flex; gap: 10px; margin-top: 5px; }
         .setup-row input { text-align: left; }
-
-        /* RESPONSIVIDADE MOBILE */
-        @media (max-width: 768px) {
-            body {
-                justify-content: center; /* Centralizado no celular */
-            }
-            .chat-layout {
-                max-width: 100%;
-                width: 100vw;
-                height: 100dvh; /* Evita que o teclado empurre o input para fora do topo da janela de exibição */
-                border: none;
-            }
-            .input-bar {
-                padding: 12px 12px 24px 12px; /* Margem inferior de segurança contra barras físicas do celular */
-            }
-        }
     </style>
 </head>
 <body>
@@ -182,7 +186,7 @@
     <div id="overlay-sync" class="overlay">
         <div class="card" style="border-color: var(--border);">
             <h3 style="margin-bottom: 20px; color: var(--blue);">Synchronizing Secure Connection...</h3>
-            <div style="font-size:0.8rem; color:#71717a; font-family: monospace;">Syncing unique UserID with EzBridge.</div>
+            <div id="sync-subtext" style="font-size:0.8rem; color:#71717a; font-family: monospace;">Syncing unique UserID with EzBridge.</div>
         </div>
     </div>
 
@@ -213,24 +217,22 @@
                 <label style="font-size: 0.75rem; color: #888;">YOUR NAME (MAX 20 CHARS)</label>
                 <input type="text" id="profile-name-input" placeholder="Leave blank for your ID" maxlength="20">
             </div>
-            <button class="btn btn-blue" type="button" onclick="updateProfileSubmit()">[UPDATE PROFILE]</button>
-            <button class="btn btn-secondary" type="button" onclick="closeProfileModal()">Cancel</button>
+            <button class="btn btn-blue" onclick="updateProfileSubmit()">[UPDATE PROFILE]</button>
+            <button class="btn btn-secondary" onclick="closeProfileModal()">Cancel</button>
         </div>
     </div>
 
     <!-- Layout do Chat Room -->
     <div class="chat-layout">
         <div class="chat-header">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <div id="status-dot" class="status-dot"></div>
-                <span style="font-weight: bold; font-size: 0.95rem;" id="my-id-display">Connecting...</span>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div id="status-dot" class="status-dot"></div>
+                    <span style="font-weight: bold; font-size: 0.95rem;" id="my-id-display">Connecting...</span>
+                </div>
+                <div style="font-size:0.75rem; color:#888;">people on this site: <span id="site-users-count" style="color:var(--blue); font-weight:bold;">0</span></div>
             </div>
-            <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto;" onclick="openProfileModal()">Profile</button>
-        </div>
-
-        <div style="padding: 10px 20px; font-size: 0.75rem; color: #71717a; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between;">
-            <div>People on this site: <span id="site-users-count" style="color:var(--blue); font-weight:bold;">0</span></div>
-            <div style="cursor: pointer; text-decoration: underline;" onclick="copyMyId()">Copy My User ID</div>
+            <button class="btn" style="padding:6px 12px; font-size:0.75rem; width:auto;" onclick="openProfileModal()">Change Profile</button>
         </div>
 
         <div id="chat-messages" class="chat-messages">
@@ -247,39 +249,44 @@
             <input type="file" id="image-input" accept="image/*" style="display:none;" onchange="handleImageSend(this)">
             
             <button class="icon-btn" onclick="triggerAudioUpload()">🎶</button>
-            <input type="file" id="audio-input" accept="audio/*, .mp3, .wav, .ogg, .m4a" style="display:none;" onchange="handleMediaSelect(this, 'audio')">
+            <input type="file" id="audio-input" accept="audio/*" style="display:none;" onchange="handleMediaSelect(this, 'audio')">
 
-            <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" oninput="handleTyping()">
+            <input type="text" id="chat-input" placeholder="Type a message or command..." autocomplete="off" oninput="handleTyping()">
             <button class="btn" onclick="sendMsg()">Send</button>
         </div>
     </div>
 
 <script>
-    // --- CREDENCIAIS ---
+    // --- CREDENCIAIS ATUALIZADAS ---
     const TUNNEL = "https://favour-fighting-headphones-enhancement.trycloudflare.com";
-    const VIRTUAL_SERVER_KEY = "13c25d9dae";
+    const VIRTUAL_SERVER_KEY = "55c130c22c";
     const OWNER_ID = "da0d3ac30047021752d9";
 
     let myId = getCookie("eb_owner_id") || "";
-    let socket = io(TUNNEL, { auth: { token: "default_key" } });
+    let socket = io(TUNNEL, { auth: { token: "default_key" }, transports: ['websocket'] });
 
     let banList = [];
     let chatHistory = [];
     let isConnected = false;
     
+    // Perfil do Usuário
     let myProfile = { name: "", avatar: "" };
 
+    // Estados do digitador
     let isTyping = false;
     let typingTimeout = null;
-    const activeTyperElements = {}; // Alinhado para exibir quem está digitando
+    const activeTypers = new Set();
 
-    const CHUNK_SIZE = 100 * 1024; 
+    // Configurações do Chunked Upload (Vídeo/Áudio)
+    const CHUNK_SIZE = 150 * 1024; 
     const pendingFileChunks = {}; 
     const activeUploads = {}; 
 
+    // --- COORDENADORES DO SISTEMA P2P LATENCY SYNC ---
     let potentialSyncHosts = [];
     let pingCheckTimeout = null;
 
+    // Carrega perfil salvo localmente
     const savedProfile = localStorage.getItem('eb_user_profile');
     if (savedProfile) {
         try { myProfile = JSON.parse(savedProfile); } catch(e) {}
@@ -296,7 +303,6 @@
         
         document.getElementById('my-id-display').innerText = `ID: ${myId.substring(0, 10)}`;
         document.getElementById('status-dot').classList.add('online');
-        document.getElementById('overlay-sync').style.display = 'none';
 
         socket.emit('join_virtual_server', { key: VIRTUAL_SERVER_KEY });
     });
@@ -304,12 +310,38 @@
     socket.on('joined_successfully', () => {
         isConnected = true;
         
-        if (myId === OWNER_ID) {
-            socket.emit('RemoteEvent', { type: 'ebdata_fetch_bans' });
-        } else {
-            socket.emit('RemoteEvent', { type: 'sync_request_bans', senderId: myId });
-        }
+        const subtext = document.getElementById('sync-subtext');
+        subtext.innerText = "Querying fastest active peer for chat history...";
 
+        potentialSyncHosts = [];
+        socket.emit('RemoteEvent', {
+            type: 'sync_ping_request',
+            senderId: myId,
+            timestamp: Date.now(),
+            room: VIRTUAL_SERVER_KEY
+        });
+
+        pingCheckTimeout = setTimeout(() => {
+            document.getElementById('overlay-sync').style.display = 'none';
+            
+            if (potentialSyncHosts.length > 0) {
+                potentialSyncHosts.sort((a, b) => a.latency - b.latency);
+                const bestHost = potentialSyncHosts[0].id;
+                
+                addSystemMessage(`Sincronizando histórico com o peer mais rápido (ID: ${bestHost.substring(0, 5)} - ${potentialSyncHosts[0].latency}ms)...`);
+                
+                socket.emit('RemoteEvent', {
+                    type: 'history_request_direct',
+                    targetId: bestHost,
+                    senderId: myId,
+                    room: VIRTUAL_SERVER_KEY
+                });
+            } else {
+                addSystemMessage("Nenhum peer ativo encontrado para sincronizar histórico. Iniciando chat limpo.");
+            }
+        }, 600); 
+
+        // Loop de monitoramento de usuários online no site (a cada 5s)
         setInterval(() => {
             if (isConnected) {
                 socket.emit('eb_heartbeat', { key: VIRTUAL_SERVER_KEY, ownerId: myId });
@@ -335,34 +367,44 @@
     socket.on('RemoteEvent', (packet) => {
         if (!isConnected) return;
 
-        if (packet.type === 'storage_response') {
-            const res = packet.result;
-            if (res && res.success === undefined) {
-                if (res.result && res.result.data) {
-                    if (packet.cmd_type === 'ebdata_fetch_bans') {
-                        banList = res.result.data;
-                        checkMyBanStatus();
-                    }
-                }
-            }
-        }
-
-        if (packet.type === 'sync_request_bans') {
-            if (banList.length > 0) {
+        if (packet.type === 'sync_ping_request') {
+            if (chatHistory.length > 0) {
                 socket.emit('RemoteEvent', {
-                    type: 'sync_response_bans',
+                    type: 'sync_ping_response',
                     targetId: packet.senderId,
-                    banList: banList
+                    senderId: myId,
+                    timestamp: packet.timestamp,
+                    room: VIRTUAL_SERVER_KEY
                 });
             }
         }
 
-        if (packet.type === 'sync_response_bans' && packet.targetId === myId) {
+        if (packet.type === 'sync_ping_response' && packet.targetId === myId) {
+            const latency = Date.now() - packet.timestamp;
+            potentialSyncHosts.push({ id: packet.senderId, latency: latency });
+        }
+
+        if (packet.type === 'history_request_direct' && packet.targetId === myId) {
+            socket.emit('RemoteEvent', {
+                type: 'history_payload_direct',
+                targetId: packet.senderId,
+                history: chatHistory,
+                banList: banList,
+                room: VIRTUAL_SERVER_KEY
+            });
+        }
+
+        if (packet.type === 'history_payload_direct' && packet.targetId === myId) {
+            chatHistory = packet.history || [];
             banList = packet.banList || [];
             checkMyBanStatus();
+            renderChatHistory();
+            addSystemMessage("Sincronização concluída com sucesso!");
         }
 
         if (packet.type === 'chat_msg') {
+            chatHistory.push({ userId: packet.userId, text: packet.text, image: packet.image, profile: packet.profile });
+            limitHistoryAndDOM();
             appendMessage(packet.userId, packet.text, packet.userId === myId, packet.image, null, null, packet.profile);
         }
 
@@ -371,17 +413,12 @@
         }
 
         if (packet.type === 'typing_status') {
-            const indicator = document.getElementById('typing-indicator');
-            const authorName = (packet.profile && packet.profile.name) ? packet.profile.name : `ID: ${packet.userId.substring(0, 10)}`;
-            
             if (packet.isTyping) {
-                activeTyperElements[packet.userId] = `${authorName} is typing...`;
+                activeTypers.add(packet.userId);
             } else {
-                delete activeTyperElements[packet.userId];
+                activeTypers.delete(packet.userId);
             }
-            
-            const typers = Object.values(activeTyperElements);
-            indicator.innerText = typers.length > 0 ? typers.join(', ') : "";
+            updateTypingDisplay();
         }
 
         if (packet.type === 'ban_broadcast') {
@@ -395,11 +432,13 @@
 
         if (packet.type === 'clear_broadcast') {
             chatHistory = [];
-            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico foi limpo.</div>`;
+            document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico do chat foi limpo pelo moderador.</div>`;
         }
     });
 
     function limitHistoryAndDOM() {
+        if (chatHistory.length > 50) chatHistory.shift();
+        
         const container = document.getElementById('chat-messages');
         while (container.children.length > 50) {
             container.removeChild(container.firstChild);
@@ -418,6 +457,17 @@
             isTyping = false;
             socket.emit('RemoteEvent', { type: 'typing_status', userId: myId, isTyping: false });
         }, 3000);
+    }
+
+    function updateTypingDisplay() {
+        const indicator = document.getElementById('typing-indicator');
+        const typersArray = Array.from(activeTypers).filter(id => id !== myId);
+        
+        if (typersArray.length > 0) {
+            indicator.innerText = typersArray.map(id => `ID: ${id.substring(0, 10)} is typing...`).join(', ');
+        } else {
+            indicator.innerText = "";
+        }
     }
 
     // --- CONFIGURAÇÃO E UPDATE DO PERFIL ---
@@ -465,7 +515,6 @@
             const base64Data = e.target.result;
             const fileId = "media_" + Date.now();
             
-            // Criar bolha local pendente (50% de opacidade) [5]
             const tempBubble = appendMessage(myId, `Uploading ${type}... 0%`, true, null, null, type, myProfile);
             tempBubble.classList.add('pending'); 
             activeUploads[fileId] = tempBubble;
@@ -509,7 +558,7 @@
                 const bubble = activeUploads[fileId];
                 if (bubble) {
                     bubble.classList.remove('pending');
-                    bubble.classList.add('sent'); // Torna opaco (100%) [5]
+                    bubble.classList.add('sent'); 
                     
                     const container = bubble.querySelector('.media-content-text');
                     container.innerHTML = "";
@@ -519,7 +568,10 @@
                         container.innerHTML = `<audio src="${fullBase64}" controls style="max-width:100%; display:block;"></audio>`;
                     }
                 }
+                
+                chatHistory.push({ userId: myId, text: "", image: null, mediaBase64: fullBase64, mediaType: type, profile: myProfile });
                 limitHistoryAndDOM();
+
                 delete activeUploads[fileId];
             }
         }
@@ -539,7 +591,9 @@
             const assembledBase64 = pendingFileChunks[fileId].join('');
             delete pendingFileChunks[fileId];
 
+            chatHistory.push({ userId, text: "", image: null, mediaBase64: assembledBase64, mediaType, profile });
             limitHistoryAndDOM();
+
             appendMessage(userId, "", userId === myId, null, assembledBase64, mediaType, profile);
         }
     }
@@ -552,7 +606,7 @@
         const file = input.files[0];
 
         if (file.size > 2 * 1024 * 1024) {
-            alert("Images must be under 2MB! Use video/gif button for larger ones.");
+            alert("Images sent via camera button must be under 2MB! Use video/gif button for larger ones.");
             input.value = "";
             return;
         }
@@ -564,7 +618,6 @@
             const tempBubble = appendMessage(myId, "", true, base64Img, null, null, myProfile);
             tempBubble.classList.add('pending');
 
-            // Feedback visual: solta a opacidade apenas quando o servidor confirmar entrega [5]
             socket.emit('RemoteEvent', {
                 type: 'chat_msg',
                 userId: myId,
@@ -576,7 +629,9 @@
                 tempBubble.classList.add('sent');
             });
 
+            chatHistory.push({ userId: myId, text: "", image: base64Img, profile: myProfile });
             limitHistoryAndDOM();
+
             input.value = "";
         };
         reader.readAsDataURL(file);
@@ -603,7 +658,6 @@
             return;
         }
 
-        // Criar bolha pendente local com 50% de opacidade [5]
         const tempBubble = appendMessage(myId, text, true, null, null, null, myProfile);
         tempBubble.classList.add('pending');
 
@@ -613,12 +667,13 @@
             text: text,
             profile: myProfile
         }, () => {
-            // Callback do Servidor: remove transparência [5]
             tempBubble.classList.remove('pending');
             tempBubble.classList.add('sent');
         });
 
+        chatHistory.push({ userId: myId, text: text, profile: myProfile });
         limitHistoryAndDOM();
+
         input.value = "";
     }
 
@@ -650,6 +705,7 @@
             }
         }
         else if (cmd === "/clear") {
+            chatHistory = [];
             document.getElementById('chat-messages').innerHTML = `<div class="system-msg">[System] O histórico foi limpo pelo moderador.</div>`;
             socket.emit('RemoteEvent', { type: 'clear_broadcast' });
         }
@@ -716,6 +772,24 @@
         container.scrollTop = container.scrollHeight;
 
         return bubble; 
+    }
+
+    function finalizeLocalPendingMessage(fileId) {
+        const bubble = activeUploads[fileId];
+        if (bubble) {
+            bubble.classList.remove('pending');
+            bubble.classList.add('sent');
+        }
+    }
+
+    // Carrega o histórico dinâmico de 50 mensagens re-sincronizado
+    function renderChatHistory() {
+        const container = document.getElementById('chat-messages');
+        container.innerHTML = "";
+        chatHistory.forEach(msg => {
+            appendMessage(msg.userId, msg.text, msg.userId === myId, msg.image, msg.mediaBase64, msg.mediaType, msg.profile);
+        });
+        limitHistoryAndDOM();
     }
 
     function addSystemMessage(text) {
